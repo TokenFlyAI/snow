@@ -58,7 +58,7 @@ export default function ResortClient({ id }: { id: string }) {
             {([["next24h", s.snow_24h_cm], ["next72h", s.snow_72h_cm], ["next7d", s.snow_7d_cm], ["next16d", s.snow_16d_cm]] as const).map(([k, v]) => (
               <div key={k} className="card px-3 py-2.5">
                 <div className="text-[11px] text-ink-3">{t(k)}</div>
-                <div className="num text-xl font-semibold">{fmtSnow(v[level], units)}</div>
+                <div className="num whitespace-nowrap text-lg font-semibold sm:text-xl">{fmtSnow(v[level], units)}</div>
               </div>
             ))}
           </div>

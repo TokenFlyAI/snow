@@ -25,7 +25,7 @@ export function ResortCard({ r, region }: { r: IndexResort; region?: Region }) {
   const cell = (label: string, cm: number | null, strong = false) => (
     <div>
       <div className="text-[11px] text-ink-3">{label}</div>
-      <div className={`num ${strong ? "text-2xl font-semibold" : "text-lg font-medium"}`}>{fmtSnow(cm, units)}</div>
+      <div className={`num whitespace-nowrap ${strong ? "text-xl font-semibold sm:text-2xl" : "text-lg font-medium"}`}>{fmtSnow(cm, units)}</div>
     </div>
   );
   return (

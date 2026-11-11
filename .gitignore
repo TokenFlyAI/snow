@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.env
+out/
+site/
+raw/
+node_modules/
+web/.next/
+web/out/
+.DS_Store
+.claude/
+web/lib/resorts.generated.json
+web/tsconfig.tsbuildinfo
+web/next-env.d.ts

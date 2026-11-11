@@ -1,0 +1,164 @@
+# Resort database. One entry per forecast point.
+# - lat/lon: centre of the main ski terrain (OSM landuse=winter_sports centroid), NOT the base town.
+# - elevation_m: base / mid / summit of lift-served terrain, in metres.
+# - passes: ikon / epic -> unlimited | 7day | 5day | 2day
+# - snotel: NRCS station triplet used for verification (US only); null if none within range.
+# - needs_review: true when a value could not be confirmed from two sources.
+regions:
+  - {id: tahoe, name: "California / Tahoe", name_zh: "加州 / 太浩湖"}
+  - {id: sierra-south, name: "California / Eastern Sierra", name_zh: "加州 / 东内华达山"}
+  - {id: utah, name: "Utah", name_zh: "犹他"}
+  - {id: colorado, name: "Colorado", name_zh: "科罗拉多"}
+  - {id: northern-rockies, name: "Wyoming / Montana / Idaho", name_zh: "怀俄明 / 蒙大拿 / 爱达荷"}
+  - {id: pnw, name: "Pacific Northwest", name_zh: "太平洋西北"}
+  - {id: northeast, name: "Northeast US", name_zh: "美国东北部"}
+  - {id: canada-west, name: "Western Canada", name_zh: "加拿大西部"}
+  - {id: japan, name: "Japan", name_zh: "日本"}
+
+resorts:
+  - id: palisades-tahoe
+    name: Palisades Tahoe
+    name_zh: 帕利塞兹太浩
+    passes: {ikon: unlimited}
+    country: US
+    state: CA
+    region: tahoe
+    lat: 39.1926
+    lon: -120.2520
+    elevation_m: {base: 1890, mid: 2325, summit: 2758}
+    timezone: America/Los_Angeles
+    snotel: "784:CA:SNTL"
+    sources: ["OSM relation 'Palisades Tahoe Olympic Valley'", "Wikipedia: base 6200 ft, top 9050 ft"]
+
+  - id: mammoth
+    name: Mammoth Mountain
+    name_zh: 猛犸山
+    passes: {ikon: unlimited}
+    country: US
+    state: CA
+    region: sierra-south
+    lat: 37.6393
+    lon: -119.0209
+    elevation_m: {base: 2424, mid: 2897, summit: 3369}
+    timezone: America/Los_Angeles
+    snotel: null
+    notes: "Nearest SNOTEL is 52 km away; CDEC station MHP (Mammoth Pass) is the better verification source."
+    sources: ["OSM way 'Mammoth Mountain'", "Wikipedia: base 7953 ft, top 11053 ft"]
+
+  - id: kirkwood
+    name: Kirkwood
+    name_zh: 柯克伍德
+    passes: {epic: unlimited}
+    country: US
+    state: CA
+    region: tahoe
+    lat: 38.6757
+    lon: -120.0659
+    elevation_m: {base: 2377, mid: 2682, summit: 2987}
+    timezone: America/Los_Angeles
+    snotel: "1067:CA:SNTL"
+    sources: ["OSM way 'Kirkwood Mountain Resort'", "Wikipedia: base 7800 ft, top 9800 ft"]
+
+  - id: alta
+    name: Alta
+    name_zh: 阿尔塔
+    passes: {ikon: 7day}
+    country: US
+    state: UT
+    region: utah
+    lat: 40.5832
+    lon: -111.6245
+    elevation_m: {base: 2600, mid: 2987, summit: 3374}
+    timezone: America/Denver
+    snotel: "1308:UT:SNTL"
+    sources: ["OSM way 'Alta Ski Area'", "Wikipedia: base 8530 ft, top 11068 ft"]
+
+  - id: jackson-hole
+    name: Jackson Hole
+    name_zh: 杰克逊霍尔
+    passes: {ikon: 7day}
+    country: US
+    state: WY
+    region: northern-rockies
+    lat: 43.5958
+    lon: -110.8497
+    elevation_m: {base: 1924, mid: 2555, summit: 3185}
+    timezone: America/Denver
+    snotel: "689:WY:SNTL"
+    notes: "SNOTEL Phillips Bench is 8 km south on Teton Pass (2490 m)."
+    sources: ["OSM way 'Jackson Hole Mountain Resort'", "Wikipedia: base 6311 ft, top 10450 ft"]
+
+  - id: vail
+    name: Vail
+    name_zh: 韦尔
+    passes: {epic: unlimited}
+    country: US
+    state: CO
+    region: colorado
+    lat: 39.6003
+    lon: -106.3472
+    elevation_m: {base: 2475, mid: 3001, summit: 3527}
+    timezone: America/Denver
+    snotel: "842:CO:SNTL"
+    sources: ["OSM way 'Vail'", "Wikipedia: base 8120 ft, top 11570 ft"]
+
+  - id: stevens-pass
+    name: Stevens Pass
+    name_zh: 史蒂文斯山口
+    passes: {epic: unlimited}
+    country: US
+    state: WA
+    region: pnw
+    lat: 47.7355
+    lon: -121.0893
+    elevation_m: {base: 1238, mid: 1510, summit: 1782}
+    timezone: America/Los_Angeles
+    snotel: "791:WA:SNTL"
+    sources: ["OSM way 'Stevens Pass'", "Wikipedia: base 4061 ft, top 5845 ft"]
+
+  - id: whistler-blackcomb
+    name: Whistler Blackcomb
+    name_zh: 惠斯勒黑梳山
+    passes: {epic: unlimited}
+    country: CA
+    state: BC
+    region: canada-west
+    lat: 50.0806
+    lon: -122.9261
+    elevation_m: {base: 675, mid: 1460, summit: 2240}
+    timezone: America/Vancouver
+    snotel: null
+    needs_review: true
+    notes: "Summit: Wikipedia lists Blackcomb 2240 m, the resort's own stats say 2284 m. Two mountains share one forecast point for now."
+    sources: ["OSM way 'Whistler Blackcomb'", "Wikipedia: Village 675 m, Blackcomb 2240 m"]
+
+  - id: killington
+    name: Killington
+    name_zh: 基灵顿
+    passes: {ikon: 7day}
+    country: US
+    state: VT
+    region: northeast
+    lat: 43.6112
+    lon: -72.7884
+    elevation_m: {base: 355, mid: 824, summit: 1293}
+    timezone: America/New_York
+    snotel: null
+    sources: ["OSM way 'Killington Resort'", "Wikipedia: base 1165 ft, top 4241 ft"]
+
+  - id: niseko-hirafu
+    name: Niseko Grand Hirafu
+    name_zh: 二世谷比罗夫
+    destination: niseko-united
+    passes: {ikon: 7day}
+    country: JP
+    state: Hokkaido
+    region: japan
+    lat: 42.8625
+    lon: 140.6900
+    elevation_m: {base: 260, mid: 730, summit: 1200}
+    timezone: Asia/Tokyo
+    snotel: null
+    needs_review: true
+    notes: "Coordinates are an estimate of the Hirafu slope centre; OSM only has a polygon for all of Niseko United (42.8655, 140.6743)."
+    sources: ["Wikipedia: base 260 m, top 1200 m"]

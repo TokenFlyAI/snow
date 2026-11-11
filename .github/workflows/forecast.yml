@@ -1,0 +1,80 @@
+name: forecast
+
+# Every 6 hours: fetch models -> compute -> publish static JSON to GitHub Pages.
+# The page at tokenfly.ai/snow/ reads https://tokenflyai.github.io/snow/data/v1/.
+# If anything fails nothing is deployed, so the previous data stays online.
+
+on:
+  schedule:
+    # ~2.5 h after the 00/06/12/18 UTC model cycles, off the top of the hour
+    - cron: "37 2,8,14,20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write     # weekly heartbeat commit (keeps scheduled runs enabled)
+  pages: write
+  id-token: write
+  issues: write       # failure alert
+
+concurrency:
+  group: forecast
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m pytest -q
+      - name: Run pipeline
+        run: python -m pipeline.run --out site/data/v1
+      - name: Add landing page
+        run: |
+          cat > site/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Snow forecast data</title>
+          <meta http-equiv="refresh" content="0; url=https://tokenfly.ai/snow/">
+          <p>Forecast data for <a href="https://tokenfly.ai/snow/">tokenfly.ai/snow</a>.
+          See <a href="data/v1/manifest.json">data/v1/manifest.json</a>.</p>
+          HTML
+          touch site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # GitHub disables scheduled workflows after 60 days without repository activity.
+      - name: Weekly heartbeat commit
+        if: github.event_name == 'schedule'
+        run: |
+          if [ "$(date -u +%u)" = "1" ] && [ "$(date -u +%H)" = "02" ]; then
+            mkdir -p status
+            cp site/data/v1/manifest.json status/last_run.json
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add status/last_run.json
+            git commit -m "chore: weekly pipeline heartbeat" || true
+            git push || true
+          fi
+
+      - name: Open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Forecast pipeline failed"
+          body="Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}  — the previous data is still being served."
+          n=$(gh issue list --repo "${{ github.repository }}" --state open --search "$title in:title" --json number --jq '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --repo "${{ github.repository }}" --body "$body"
+          else gh issue create --repo "${{ github.repository }}" --title "$title" --body "$body"; fi

@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from pipeline.process.blend import blend, confidence, weighted_quantile, weights_for
+from pipeline.process.blend import (blend, daily_range, ensemble_agreement, ensemble_confidence,
+                                    model_spread_confidence, weighted_quantile, weights_for)
 
 
 def test_weights_change_with_lead_time():
@@ -38,10 +39,45 @@ def test_weighted_quantile():
     assert weighted_quantile([0.0, 30.0], [1.0, 9.0], 0.5) > 20.0
 
 
-def test_confidence_from_agreement_and_lead():
+def test_ensemble_agreement_is_the_share_of_members_near_the_point():
+    w = [1.0] * 10
+    members = [0, 2, 8, 9, 10, 11, 12, 14, 30, 40]
+    # point 10 cm: "near" is 5..15 cm -> 6 of 10 members
+    assert ensemble_agreement(10.0, members, w) == pytest.approx(0.6)
+    # dry forecast: members under 5 cm agree -> 2 of 10
+    assert ensemble_agreement(0.0, members, w) == pytest.approx(0.2)
+    # big storm: +-50 % of 30 cm is 15..45 -> 2 of 10
+    assert ensemble_agreement(30.0, members, w) == pytest.approx(0.2)
+    # weights count, missing members do not vote
+    assert ensemble_agreement(10.0, [10.0, 40.0, float("nan")], [3.0, 1.0, 5.0]) == pytest.approx(0.75)
+    assert np.isnan(ensemble_agreement(10.0, [], []))
+    assert np.isnan(ensemble_agreement(float("nan"), members, w))
+
+
+def test_ensemble_confidence_levels_and_lead_cap():
+    assert ensemble_confidence(0.8, 2) == "high"
+    assert ensemble_confidence(0.5, 2) == "high"
+    assert ensemble_confidence(0.3, 2) == "medium"
+    assert ensemble_confidence(0.1, 2) == "low"
+    assert ensemble_confidence(0.9, 7) == "medium"      # a week out is never "high"
+    assert ensemble_confidence(0.1, 9) == "low"
+    assert ensemble_confidence(float("nan"), 1) == "low"
+
+
+def test_model_spread_confidence_is_the_fallback():
     w = [1.0] * 4
-    assert confidence([20.0, 22.0, 19.0, 21.0], w, 1) == "high"
-    assert confidence([0.0, 0.0, 0.5, 0.0], w, 1) == "high"        # agreeing on a dry day
-    assert confidence([2.0, 40.0, 10.0, 25.0], w, 1) == "low"
-    assert confidence([20.0, 22.0, 19.0, 21.0], w, 7) == "medium"  # capped by lead time
-    assert confidence([20.0, 22.0, 19.0, 21.0], w, 12) == "low"
+    assert model_spread_confidence([20.0, 22.0, 19.0, 21.0], w, 1) == "high"
+    assert model_spread_confidence([0.0, 0.0, 0.5, 0.0], w, 1) == "high"        # agreeing on a dry day
+    assert model_spread_confidence([2.0, 40.0, 10.0, 25.0], w, 1) == "low"
+    assert model_spread_confidence([20.0, 22.0, 19.0, 21.0], w, 7) == "medium"  # capped by lead time
+    assert model_spread_confidence([20.0], [1.0], 1) == "medium"
+
+
+def test_daily_range_prefers_the_ensemble_and_always_contains_the_point():
+    nan = float("nan")
+    assert daily_range(10.0, 4.0, 18.0, [1.0, 2.0], [1.0, 1.0]) == (4.0, 18.0, "ensemble")
+    assert daily_range(10.0, 12.0, 18.0, [], []) == (10.0, 18.0, "ensemble")     # widened down to the point
+    assert daily_range(25.0, 4.0, 18.0, [], []) == (4.0, 25.0, "ensemble")       # widened up to the point
+    lo, hi, src = daily_range(10.0, nan, nan, [5.0, 20.0], [1.0, 1.0])
+    assert src == "models" and lo <= 10.0 <= hi
+    assert daily_range(3.0, nan, nan, [], []) == (3.0, 3.0, "models")

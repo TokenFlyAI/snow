@@ -1,7 +1,16 @@
 """Pipeline entry point:  python -m pipeline.run --out site/data/v1
 
-ingest (Open-Meteo, one request per model) -> derive (elevation correction,
-snow level, SLR) -> blend -> aggregate -> publish static JSON.
+    plan -> ingest (Open-Meteo forecast + ensemble APIs) -> derive (elevation
+    correction, snow level, SLR) -> blend -> ensemble percentiles -> publish JSON.
+
+Refresh tiers (see config.py and data/featured.yaml):
+
+    featured   every run (6-hourly): all deterministic models
+    standard   once a day, in the run before the resort's local morning: 3 models
+    ensembles  once a day for every resort (4 ensembles for featured, GEFS otherwise)
+
+Everything that is not due is copied from the previously published data set
+(--previous), so each run publishes a complete tree.
 
 Exit code is non-zero when the result is not fit to publish, so the
 workflow keeps the previous deployment.
@@ -11,18 +20,27 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
-from .config import MODEL_BY_ID, MODELS, models_for
-from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, make_client
+from .config import (DAILY_DAYS, ENSEMBLES, FRESH_WITHIN_H, MODELS, OUTLOOK_WEEKS, STALE_AFTER_H, current_slot,
+                     ensembles_for, estimate_daily_calls, load_featured, models_for, refresh_slot)
+from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, hourly_vars, make_client
+from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
+from .process.ensemble import raw_document
 from .publish.build import build_index, build_manifest, build_resort
-from .resorts import load_resorts
+from .resorts import Resort, load_resorts
+from .state import DEFAULT_PREVIOUS, Previous, age_hours
 
 log = logging.getLogger("pipeline")
 MIN_MODELS_OK = 2
+MIN_RESORT_SHARE = 0.9          # publish only if at least this share of the resorts has a document
+ENS_DAYS = 7 * max(OUTLOOK_WEEKS)
 
 
 def _write(path: Path, doc: dict) -> None:
@@ -31,20 +49,87 @@ def _write(path: Path, doc: dict) -> None:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
-def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None = None) -> int:
+@dataclass
+class Task:
+    resort: Resort
+    tier: str
+    det: bool      # fetch deterministic models and rebuild the document
+    ens: bool      # fetch ensembles
+    why: str
+
+
+def plan(resorts: list[Resort], featured: set[str], prev_index: Optional[dict], now: datetime,
+         mode: str = "auto") -> list[Task]:
+    """Decide per resort what this run refreshes.
+
+    mode: auto (schedule-driven), full (everything), featured (featured resorts only; whatever
+    else is missing from the previous data set is still filled in).
+    """
+    prev = {r["id"]: r for r in (prev_index or {}).get("resorts", [])}
+    slot = current_slot(now.hour)
+    tasks = []
+    for r in resorts:
+        tier = "featured" if r.id in featured else "standard"
+        p = prev.get(r.id)
+        if mode == "full":
+            tasks.append(Task(r, tier, True, True, "full run"))
+            continue
+        if p is None or p.get("tier") != tier:
+            tasks.append(Task(r, tier, True, True, "new" if p is None else "tier changed"))
+            continue
+        a_doc, a_ens = age_hours(p.get("generated_at"), now), age_hours(p.get("ensemble_at"), now)
+        due = mode == "auto" and refresh_slot(r.lon) == slot
+
+        def needs(age: Optional[float]) -> bool:
+            return age is None or age > STALE_AFTER_H or (due and age > FRESH_WITHIN_H)
+        ens = needs(a_ens)
+        det = tier == "featured" or ens or needs(a_doc)
+        why = "featured" if tier == "featured" else "due" if due and det else "stale" if det else "carried"
+        tasks.append(Task(r, tier, det, ens, why))
+    return tasks
+
+
+def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None = None,
+        mode: str = "auto", previous: Optional[str] = DEFAULT_PREVIOUS, featured_path: str | None = None,
+        now: Optional[datetime] = None) -> int:
     db = load_resorts(resorts_path) if resorts_path else load_resorts()
+    featured = set(load_featured(featured_path) if featured_path else load_featured())
+    unknown = featured - {r.id for r in db.resorts}
+    if unknown:
+        log.error("data/featured.yaml lists unknown resorts: %s", ", ".join(sorted(unknown)))
+        return 2
     resorts = [r for r in db.resorts if not only or r.id in only]
     if not resorts:
         log.error("no resorts selected")
         return 2
-    now = datetime.now(timezone.utc)
+    now = now or datetime.now(timezone.utc)
+    prev = Previous(previous)
+    prev_index = prev.get("resorts.json")
+    tasks = plan(resorts, featured, prev_index, now, mode)
+
+    # ---- previously published files for everything that is not refreshed ----------------
+    carried = prev.get_many(f"resort/{t.resort.id}.json" for t in tasks if not t.det)
+    old_ens = prev.get_many(f"ens/{t.resort.id}.json" for t in tasks if not t.ens)
+    for t in tasks:
+        if not t.det and carried.get(f"resort/{t.resort.id}.json") is None:
+            t.det, t.why = True, "previous document unavailable"
+        if not t.ens and old_ens.get(f"ens/{t.resort.id}.json") is None:
+            t.ens, t.det, t.why = True, True, "previous ensemble unavailable"
+    det_tasks = [t for t in tasks if t.det]
+    ens_tasks = [t for t in tasks if t.ens]
+    log.info("%d resorts (%d featured): deterministic refresh %d, ensemble refresh %d, carried over %d  [mode=%s, slot=%02d UTC]",
+             len(tasks), sum(t.tier == "featured" for t in tasks), len(det_tasks), len(ens_tasks),
+             len(tasks) - len(det_tasks), mode, current_slot(now.hour))
+
     usage: dict = {}
     raw: dict[str, dict[str, ModelData]] = {}
     status: dict[str, dict] = {}
+    ens_data: dict[str, dict[str, EnsembleData]] = {}
+    ens_status: dict[str, dict] = {}
 
     with make_client() as client:
         for spec in MODELS:
-            wanted = [r for r in resorts if spec in models_for(r)]
+            wanted = [t.resort for t in det_tasks if spec in models_for(t.resort, t.tier)]
             if not wanted:
                 continue
             try:
@@ -53,52 +138,112 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
                 status[spec.id] = {"label": spec.label, "kind": spec.kind,
                                    "status": "ok" if n_ok else "missing",
                                    "resorts_ok": n_ok, "resorts_requested": len(wanted)}
-                log.info("%-22s ok for %d/%d resorts", spec.id, n_ok, len(wanted))
+                log.info("%-28s ok for %d/%d resorts", spec.id, n_ok, len(wanted))
             except OpenMeteoError as e:
                 status[spec.id] = {"label": spec.label, "kind": spec.kind, "status": "missing",
                                    "resorts_ok": 0, "resorts_requested": len(wanted), "error": str(e)[:200]}
-                log.warning("%-22s dropped: %s", spec.id, e)
+                log.warning("%-28s dropped: %s", spec.id, e)
+        for spec in ENSEMBLES:
+            wanted = [t.resort for t in ens_tasks if spec in ensembles_for(t.tier)]
+            if not wanted:
+                continue
+            try:
+                ens_data[spec.id] = fetch_ensemble(client, spec, wanted, usage=usage)
+                n_ok = sum(1 for ed in ens_data[spec.id].values() if ed.has_data)
+                ens_status[spec.id] = {"label": spec.label, "members": spec.members, "days": spec.days,
+                                       "status": "ok" if n_ok else "missing",
+                                       "resorts_ok": n_ok, "resorts_requested": len(wanted)}
+                log.info("ensemble %-19s ok for %d/%d resorts", spec.id, n_ok, len(wanted))
+            except OpenMeteoError as e:
+                ens_status[spec.id] = {"label": spec.label, "members": spec.members, "days": spec.days,
+                                       "status": "missing", "resorts_ok": 0, "resorts_requested": len(wanted),
+                                       "error": str(e)[:200]}
+                log.warning("ensemble %-19s dropped: %s", spec.id, e)
 
     n_models_ok = sum(1 for s in status.values() if s["status"] == "ok")
-    if n_models_ok < MIN_MODELS_OK:
+    if det_tasks and n_models_ok < MIN_MODELS_OK:
         log.error("only %d models available (< %d): not publishing", n_models_ok, MIN_MODELS_OK)
         return 1
 
-    docs, failed = [], []
-    for resort in resorts:
-        expected = [m.id for m in models_for(resort)]
-        mds = [raw[m][resort.id] for m in expected if m in raw and resort.id in raw[m] and raw[m][resort.id].has_data]
-        missing = [m for m in expected if m not in {md.model for md in mds}]
-        if not mds:
+    docs, failed, n_carried = [], [], 0
+    for t in tasks:
+        resort = t.resort
+        # ---- ensemble member totals: fresh, or the cached file from the last refresh ----
+        ens_raw = old_ens.get(f"ens/{resort.id}.json")
+        if t.ens:
+            got = {mid: (d[resort.id].time, d[resort.id].members) for mid, d in ens_data.items()
+                   if resort.id in d and d[resort.id].has_data}
+            if got:
+                from zoneinfo import ZoneInfo
+                today = now.astimezone(ZoneInfo(resort.timezone)).date()
+                ens_raw = raw_document(resort.id, resort.elevation_m.mid, today, ENS_DAYS, resort.timezone, got, now)
+            else:
+                ens_raw = prev.get(f"ens/{resort.id}.json")   # keep yesterday's rather than nothing
+        if ens_raw:
+            _write(out_dir / "ens" / f"{resort.id}.json", ens_raw)
+
+        # ---- resort document ----
+        doc = None
+        if t.det:
+            expected = [m.id for m in models_for(resort, t.tier)]
+            mds = [raw[m][resort.id] for m in expected if m in raw and resort.id in raw[m] and raw[m][resort.id].has_data]
+            missing = [m for m in expected if m not in {md.model for md in mds}]
+            if mds:
+                first = [derive(md, resort) for md in mds]
+                donor = make_donor(first)
+                derived = [d if d.has_profile else derive(md, resort, donor) for d, md in zip(first, mds)]
+                doc = build_resort(resort, derived, now, missing_models=missing, ens_raw=ens_raw, tier=t.tier)
+                s = doc["summary"]
+                log.debug("%-26s %-8s models=%d members=%d  24h=%s 72h=%s 7d=%s 16d=%s cm (mid)", resort.id, t.tier,
+                          len(derived), sum(m["members"] for m in (doc["ensemble"] or {}).get("models", [])),
+                          s["snow_24h_cm"]["mid"], s["snow_72h_cm"]["mid"], s["snow_7d_cm"]["mid"], s["snow_16d_cm"]["mid"])
+            else:
+                doc = prev.get(f"resort/{resort.id}.json")    # keep the old forecast rather than drop the resort
+                if doc:
+                    log.warning("%s: no model data, keeping the previous document", resort.id)
+        else:
+            doc = carried[f"resort/{resort.id}.json"]
+            n_carried += 1
+        if doc is None:
             failed.append(resort.id)
             continue
-        first = [derive(md, resort) for md in mds]
-        donor = make_donor(first)
-        derived = [d if d.has_profile else derive(md, resort, donor) for d, md in zip(first, mds)]
-        doc = build_resort(resort, derived, now, missing_models=missing)
         _write(out_dir / "resort" / f"{resort.id}.json", doc)
         docs.append(doc)
-        s = doc["summary"]
-        log.info("%-20s models=%d  24h=%s  72h=%s  7d=%s  16d=%s cm (mid)", resort.id, len(derived),
-                 s["snow_24h_cm"]["mid"], s["snow_72h_cm"]["mid"], s["snow_7d_cm"]["mid"], s["snow_16d_cm"]["mid"])
 
     if failed:
-        log.error("no data at all for: %s: not publishing", ", ".join(failed))
+        log.warning("no data for %d resorts: %s", len(failed), ", ".join(failed))
+    if len(docs) < MIN_RESORT_SHARE * len(tasks):
+        log.error("only %d of %d resorts have a forecast: not publishing", len(docs), len(tasks))
         return 1
 
+    budget = estimate_daily_calls(db.resorts, featured, len(hourly_vars()))
+    run_info = {
+        "mode": mode, "slot_utc": current_slot(now.hour),
+        "resorts": len(tasks), "featured": sum(t.tier == "featured" for t in tasks),
+        "refreshed_deterministic": len(det_tasks), "refreshed_ensemble": len(ens_tasks),
+        "carried_over": n_carried, "failed": failed,
+    }
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
     # manifest is written last: its presence marks a complete run
-    _write(out_dir / "manifest.json", build_manifest(now, status, len(docs), usage))
-    log.info("published %d resorts, %d models, ~%.0f weighted API calls -> %s",
-             len(docs), n_models_ok, usage.get("weighted_calls", 0.0), out_dir)
+    _write(out_dir / "manifest.json", build_manifest(now, status, len(docs), usage, ens_status, run_info, budget))
+    log.info("published %d resorts (%d refreshed, %d carried over); this run ~%.0f weighted API calls %s; "
+             "scheduled daily total ~%.0f of %d -> %s", len(docs), len(det_tasks), n_carried,
+             usage.get("weighted_calls", 0.0), {k: round(v) for k, v in usage.get("by_kind", {}).items()},
+             budget["total"], 10000, out_dir)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default="site/data/v1", help="output directory")
     ap.add_argument("--resorts", default="", help="comma-separated resort ids (default: all)")
     ap.add_argument("--resorts-file", default=None)
+    ap.add_argument("--featured-file", default=None)
+    ap.add_argument("--mode", choices=("auto", "full", "featured"), default="auto",
+                    help="auto: follow the refresh schedule (default); full: refresh everything; "
+                         "featured: only the featured resorts")
+    ap.add_argument("--previous", default=os.environ.get("SNOW_PREVIOUS", DEFAULT_PREVIOUS),
+                    help="URL or directory of the last published data set, or 'none'")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -106,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     only = [s.strip() for s in args.resorts.split(",") if s.strip()] or None
-    return run(Path(args.out), only, args.resorts_file)
+    return run(Path(args.out), only, args.resorts_file, args.mode, args.previous, args.featured_file)
 
 
 if __name__ == "__main__":

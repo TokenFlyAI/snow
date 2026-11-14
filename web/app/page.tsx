@@ -12,7 +12,7 @@ export default function Home() {
   if (!ready) return null;
   const regionOf = (id: string) => data?.regions.find((r) => r.id === id);
   const mine = data ? favorites.map((id) => data.resorts.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r) : [];
-  const ranked = data ? [...data.resorts].sort((a, b) => (b.summary.snow_7d_cm[level] ?? 0) - (a.summary.snow_7d_cm[level] ?? 0)) : [];
+  const ranked = data ? [...data.resorts].sort((a, b) => (b.summary.snow_7d_cm[level] ?? 0) - (a.summary.snow_7d_cm[level] ?? 0)).slice(0, 10) : [];
 
   return (
     <div>
@@ -64,6 +64,7 @@ export default function Home() {
                 );
               })}
             </ol>
+            <Link href="/rank/" className="mt-3 inline-block text-sm text-ink-2 underline decoration-line underline-offset-4">{t("seeAll")} →</Link>
           </section>
         </>
       )}

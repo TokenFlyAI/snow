@@ -1,12 +1,12 @@
 "use client";
 import { BarChart, CustomChart, LineChart } from "echarts/charts";
-import { GridComponent, LegendComponent, MarkLineComponent, TooltipComponent } from "echarts/components";
+import { GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent } from "echarts/components";
 import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
 import { useUser } from "../Providers";
 
-echarts.use([BarChart, LineChart, CustomChart, GridComponent, LegendComponent, MarkLineComponent, TooltipComponent, CanvasRenderer]);
+echarts.use([BarChart, LineChart, CustomChart, GridComponent, LegendComponent, MarkAreaComponent, MarkLineComponent, TooltipComponent, CanvasRenderer]);
 
 export interface Palette {
   surface: string; text: string; text2: string; muted: string; grid: string; line: string;

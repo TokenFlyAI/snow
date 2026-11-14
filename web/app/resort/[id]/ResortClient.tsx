@@ -3,11 +3,12 @@ import { FollowButton, LevelPicker, LoadState, PassBadges, resortName, Updated }
 import { DailyChart } from "@/components/charts/DailyChart";
 import { HourlyCharts } from "@/components/charts/HourlyCharts";
 import { ModelChart } from "@/components/charts/ModelChart";
+import { OutlookWeeks, ProbDays } from "@/components/Outlook";
 import { useUser } from "@/components/Providers";
 import { useResort } from "@/lib/data";
-import { fmtDate } from "@/lib/i18n";
+import { fmtDate, fmtProb, fmtUpdated } from "@/lib/i18n";
 import { REGIONS, resortById } from "@/lib/resorts";
-import type { Daily } from "@/lib/types";
+import type { Daily, ProbDay } from "@/lib/types";
 import { fmtHeight, fmtPrecip, fmtSnow, fmtTemp, fmtWind } from "@/lib/units";
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -27,6 +28,9 @@ export default function ResortClient({ id }: { id: string }) {
   if (!ready || !meta) return null;
   const region = REGIONS.find((r) => r.id === meta.region);
   const s = data?.summary;
+  const point = (data?.daily ?? []).filter((d): d is Daily => d.kind === "point");
+  const prob = (data?.daily ?? []).filter((d): d is ProbDay => d.kind === "prob");
+  const t16 = s?.totals?.["16d"];
   const confDot = (d: Daily) => ({ high: "var(--good)", medium: "var(--warning)", low: "var(--critical)" }[d.confidence]);
 
   return (
@@ -42,6 +46,7 @@ export default function ResortClient({ id }: { id: string }) {
             {t("base")} {fmtHeight(meta.elevation_m.base, units, true)} · {t("mid")} {fmtHeight(meta.elevation_m.mid, units, true)} · {t("summit")} {fmtHeight(meta.elevation_m.summit, units, true)}
           </p>
           {meta.needs_review && <p className="mt-1 text-xs text-ink-3">⚠ {t("needsReview")}</p>}
+          {data && <p className="mt-1 text-xs text-ink-3">{t(data.resort.tier === "featured" ? "tierFeatured" : "tierStandard")}</p>}
         </div>
         <FollowButton id={id} />
       </div>
@@ -59,6 +64,9 @@ export default function ResortClient({ id }: { id: string }) {
               <div key={k} className="card px-3 py-2.5">
                 <div className="text-[11px] text-ink-3">{t(k)}</div>
                 <div className="num whitespace-nowrap text-lg font-semibold sm:text-xl">{fmtSnow(v[level], units)}</div>
+                {k === "next16d" && t16?.low_cm && t16.high_cm && (
+                  <div className="num whitespace-nowrap text-[11px] text-ink-3">{fmtSnow(t16.low_cm[level], units, false)}–{fmtSnow(t16.high_cm[level], units, false)}</div>
+                )}
               </div>
             ))}
           </div>
@@ -81,15 +89,18 @@ export default function ResortClient({ id }: { id: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.daily.map((d) => (
-                    <tr key={d.date} className={d.lead_days >= 10 ? "text-ink-3" : ""}>
+                  {point.map((d) => (
+                    <tr key={d.date}>
                       <td>{d.lead_days === 0 ? t("today") : fmtDate(d.date, lang)}</td>
                       <td>{fmtSnow(d.snow_night_cm[level], units)}</td>
                       <td>{fmtSnow(d.snow_day_cm[level], units)}</td>
                       <td className="font-semibold">{fmtSnow(d.snow_cm[level], units)}</td>
                       <td>{fmtSnow(d.snow_low_cm[level], units, false)}–{fmtSnow(d.snow_high_cm[level], units)}</td>
                       <td>{d.quality === "none" ? "–" : t(d.quality)}</td>
-                      <td><span aria-hidden className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: confDot(d) }} />{t(d.confidence)}</td>
+                      <td title={d.ens?.agreement != null ? `${t("agreement")} ${fmtProb(d.ens.agreement)}` : undefined}>
+                        <span aria-hidden className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: confDot(d) }} />{t(d.confidence)}
+                        {d.ens?.agreement != null && <span className="ml-1 text-ink-3">{fmtProb(d.ens.agreement)}</span>}
+                      </td>
                       <td>{fmtTemp(d.temp_max_c.summit, units)} / {fmtTemp(d.temp_min_c.summit, units)}</td>
                       <td>{fmtTemp(d.temp_max_c.base, units)} / {fmtTemp(d.temp_min_c.base, units)}</td>
                       <td>{d.snow_level_m.during_precip ? `${fmtHeight(d.snow_level_m.min, units).replace(/ \w+$/, "")}–${fmtHeight(d.snow_level_m.max, units)}` : "–"}</td>
@@ -100,8 +111,21 @@ export default function ResortClient({ id }: { id: string }) {
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-ink-3">{t("farOut")}</p>
+            <ProbDays days={prob} level={level} />
+            {data.ensemble && (
+              <p className="mt-3 text-xs leading-5 text-ink-3">
+                {t("ensembleInfo")}: {data.ensemble.models.map((m) => `${m.label} ${m.members}`).join(" · ")} {t("members")}
+                {" · "}{t("calibration")} ×{data.ensemble.calibration.factor}
+                {data.ensemble.generated_at && <> · {t("updated")} {fmtUpdated(data.ensemble.generated_at, lang)}</>}
+              </p>
+            )}
           </Section>
+
+          {data.outlook.length > 0 && (
+            <Section title={`${t("outlook")} · ${t("mid")}`} hint={t("outlookHint")}>
+              <OutlookWeeks weeks={data.outlook} />
+            </Section>
+          )}
 
           <Section title={`${t("models")} · ${t(level)}`} hint={t("modelsHint")}>
             <ModelChart doc={data} level={level} />

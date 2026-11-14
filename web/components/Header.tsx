@@ -33,8 +33,10 @@ export function Header() {
               aria-label={t("theme")} title={t("theme")}>{resolvedTheme === "dark" ? "☾" : "☀"}</button>
           </div>
         </div>
-        <nav className="mt-3 flex gap-5">
+        <nav className="scroll-x mt-3 flex gap-5 whitespace-nowrap">
           {tab("/", t("myResorts"))}
+          {tab("/map", t("map"))}
+          {tab("/rank", t("rank"))}
           {tab("/resorts", t("allResorts"))}
           {tab("/about", t("about"))}
         </nav>

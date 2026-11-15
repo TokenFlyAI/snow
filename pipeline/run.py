@@ -33,7 +33,7 @@ from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, hourly_va
 from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
-from .publish.build import build_index, build_manifest, build_resort
+from .publish.build import build_index, build_manifest, build_resort, split_daily
 from .resorts import Resort, load_resorts
 from .state import DEFAULT_PREVIOUS, Previous, age_hours
 
@@ -207,6 +207,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         if doc is None:
             failed.append(resort.id)
             continue
+        split_daily(doc)
         _write(out_dir / "resort" / f"{resort.id}.json", doc)
         docs.append(doc)
 

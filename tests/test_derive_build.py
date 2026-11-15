@@ -129,8 +129,10 @@ def test_build_resort_with_ensemble_publishes_ranges_probabilities_and_outlook()
     json.dumps(doc, allow_nan=False)
     assert doc["resort"]["tier"] == "featured"
 
-    daily = doc["daily"]
-    assert [e["kind"] for e in daily] == ["point"] * 10 + ["prob"] * 6
+    assert [e["kind"] for e in doc["daily"]] == ["point"] * 10      # readers of phase-1 fields only see these
+    assert [e["kind"] for e in doc["daily_prob"]] == ["prob"] * 6
+    assert doc["daily_prob"][0]["lead_days"] == 10
+    daily = doc["daily"] + doc["daily_prob"]
     # beyond day 10 there is no point value, only percentiles and probabilities
     far = daily[12]
     assert "snow_cm" not in far and set(far["ens"]["prob"]) == {"2.5", "15"}
@@ -172,7 +174,7 @@ def test_stale_ensemble_file_is_realigned_by_date():
     # the cached member totals start two days before "today": the first two days are simply dropped
     doc = build_resort(r, derived, NOW, ens_raw=_ens_raw(start="2026-01-07"))
     assert doc["daily"][0]["ens"]["n_members"] == 20
-    assert len(doc["daily"]) == 16
+    assert len(doc["daily"]) + len(doc["daily_prob"]) == 16
     assert [o["week"] for o in doc["outlook"]] == [3, 4]     # week 5 is no longer covered
 
 
@@ -184,6 +186,15 @@ def test_high_resolution_model_dominates_early_then_drops_out():
     h = build_resort(r, [lo, hi], NOW)["hourly"]["precip_mm"]
     assert h[0] == pytest.approx((1.0 * 1.5 + 3.0 * 3.0) / 4.5, abs=0.01)   # 0-48 h weights 1.5 : 3
     assert h[100] == pytest.approx(1.0)                                      # HRRR gone, GFS alone
+
+
+def test_split_daily_converts_documents_published_before_daily_prob():
+    from pipeline.publish.build import split_daily
+    old = {"daily": [{"kind": "point", "lead_days": 0}, {"kind": "prob", "lead_days": 10}]}
+    split_daily(old)
+    assert [e["lead_days"] for e in old["daily"]] == [0] and [e["lead_days"] for e in old["daily_prob"]] == [10]
+    new = {"daily": [{"kind": "point"}], "daily_prob": [{"kind": "prob"}]}
+    assert split_daily(dict(new)) == new
 
 
 def test_index_and_manifest():

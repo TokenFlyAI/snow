@@ -334,10 +334,22 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
         "ensemble": ensemble_info,
         "summary": summary,
         "hourly": hourly,
-        "daily": daily,
+        # point days and probability-only days are kept apart, so a reader that only knows the
+        # point-day fields (the phase-1 page shell) never meets an entry without them
+        "daily": [e for e in daily if e["kind"] == "point"],
+        "daily_prob": [e for e in daily if e["kind"] == "prob"],
         "outlook": outlook,
         "by_model_daily_cm": by_model,
     }
+
+
+def split_daily(doc: dict) -> dict:
+    """Move probability-only days out of `daily` (documents published before `daily_prob` existed)."""
+    if "daily_prob" not in doc:
+        days = doc.get("daily", [])
+        doc["daily"] = [e for e in days if e.get("kind", "point") == "point"]
+        doc["daily_prob"] = [e for e in days if e.get("kind") == "prob"]
+    return doc
 
 
 def build_index(regions: list[Region], docs: list[dict], now: datetime) -> dict:

@@ -29,7 +29,7 @@ export default function ResortClient({ id }: { id: string }) {
   const region = REGIONS.find((r) => r.id === meta.region);
   const s = data?.summary;
   const point = (data?.daily ?? []).filter((d): d is Daily => d.kind === "point");
-  const prob = (data?.daily ?? []).filter((d): d is ProbDay => d.kind === "prob");
+  const prob = [...(data?.daily ?? []).filter((d): d is ProbDay => d.kind === "prob"), ...(data?.daily_prob ?? [])];
   const t16 = s?.totals?.["16d"];
   const confDot = (d: Daily) => ({ high: "var(--good)", medium: "var(--warning)", low: "var(--critical)" }[d.confidence]);
 
@@ -77,7 +77,7 @@ export default function ResortClient({ id }: { id: string }) {
           </p>
 
           <Section title={`${t("daily")} · ${t(level)}`} hint={t("dailyHint")}>
-            <DailyChart daily={data.daily} level={level} />
+            <DailyChart daily={[...point, ...prob]} level={level} />
             <div className="scroll-x mt-4">
               <table className="data num">
                 <thead>

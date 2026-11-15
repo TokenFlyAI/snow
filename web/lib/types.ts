@@ -90,7 +90,11 @@ export interface Hourly {
 export interface ResortDoc {
   schema_version: number; generated_at: string; resort: ResortMeta; models: ModelInfo[];
   ensemble: EnsembleInfo | null; outlook: OutlookWeek[];
-  summary: Summary; hourly: Hourly; daily: DayEntry[];
+  summary: Summary; hourly: Hourly;
+  /** point days (D+0..D+9); older documents also carried the probability days here */
+  daily: DayEntry[];
+  /** probability-only days (D+10..D+15) */
+  daily_prob?: ProbDay[];
   by_model_daily_cm: Record<string, ByLevel<(number | null)[]>>;
 }
 

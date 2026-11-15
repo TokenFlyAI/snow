@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 45
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -51,7 +51,16 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # The deploy right after the upload occasionally fails on GitHub's side ("No artifacts named
+      # github-pages were found", 2026-11-15 19:56); one retry after a pause.
       - id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before retrying the deploy
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 45
+      - id: deploy_retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
 
       # Every issued forecast is kept on the orphan branch "archive" so it can be scored against
@@ -64,11 +73,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           scripts/push_archive.sh archive "archive: run ${{ github.run_id }} ($(date -u +%Y-%m-%dT%H:%MZ))"
 
-      # GitHub disables scheduled workflows after 60 days without repository activity.
+      # GitHub disables scheduled workflows after 60 days without repository activity. Keyed on the
+      # age of the last commit on main, not on one cron slot: scheduled runs are often skipped.
       - name: Weekly heartbeat commit
         if: github.event_name == 'schedule'
         run: |
-          if [ "$(date -u +%u)" = "1" ] && [ "$(date -u +%H)" = "02" ]; then
+          if [ $(( $(date -u +%s) - $(git log -1 --format=%ct) )) -gt $(( 7 * 86400 )) ]; then
             mkdir -p status
             cp site/data/v1/manifest.json status/last_run.json
             git config user.name "github-actions[bot]"

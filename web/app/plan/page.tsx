@@ -3,13 +3,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { LoadState, PassBadges, RegionSelect, resortName, Updated } from "@/components/Bits";
 import { useUser } from "@/components/Providers";
-import { usePlanner } from "@/lib/data";
+import { DATA_BASE, usePlanner } from "@/lib/data";
 import { fmtDate, fmtProb } from "@/lib/i18n";
 import {
   type Advice, type PlannerDay, type PlannerResort, LIFTS_CLOSE_H, MIN_SCORE, RANK_MAX_AHEAD,
   addDays, advice, daysBetween, decodePlanner, isWeekend, resortNow, weekday,
 } from "@/lib/planner";
-import { inRegion } from "@/lib/regions";
+import { inRegion, regionLabel } from "@/lib/regions";
 import { fmtSnow, fmtThreshold } from "@/lib/units";
 
 type PassFilter = "all" | "ikon" | "epic";
@@ -113,6 +113,7 @@ export default function Plan() {
   const regionName = (id: string) => { const g = data?.regions.find((x) => x.id === id); return g ? (lang === "zh" ? g.name_zh : g.name) : id; };
   const used = new Set(resorts.map((r) => r.region));
   const six = fmtThreshold(15, units);
+  const areaName = area === "all" ? t("planAllAreas") : regionLabel(area, lang, data?.regions ?? []);
   const chanceLabel = units === "imperial" ? t("planChance6") : t("planChance15");
   const fmtD = (iso: string) => fmtDate(iso, lang);
   const share = async () => {
@@ -242,13 +243,39 @@ export default function Plan() {
             </section>
           )}
 
-          <details className="card mt-6 p-4 text-xs leading-5 text-ink-2">
+          <CalendarFeed pass={pass} area={area} areaName={areaName} six={six} />
+
+          <details className="card mt-3 p-4 text-xs leading-5 text-ink-2">
             <summary className="cursor-pointer text-sm font-medium text-ink">{t("planHow")}</summary>
             <p className="mt-2">{t("planHowText").replaceAll("{t}", six)}</p>
           </details>
         </>
       )}
     </div>
+  );
+}
+
+/** Calendar subscription (pipeline/publish/ics.py): one feed per language x pass x area. */
+function CalendarFeed({ pass, area, areaName, six }: { pass: PassFilter; area: string; areaName: string; six: string }) {
+  const { t, lang } = useUser();
+  const [copied, setCopied] = useState(false);
+  const slug = area.startsWith("g:") ? `g-${area.slice(2)}` : area;
+  const base = DATA_BASE.startsWith("/") && typeof window !== "undefined" ? `${window.location.origin}${DATA_BASE}` : DATA_BASE;
+  const url = `${base}/ics/${lang}/${pass}/${slug}.ics`;
+  const webcal = url.replace(/^https?:/, "webcal:");
+  const copy = () => navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  const passName = pass === "all" ? t("all") : pass === "ikon" ? "Ikon" : "Epic";
+  return (
+    <details className="card mt-6 p-4 text-xs leading-5 text-ink-2">
+      <summary className="cursor-pointer text-sm font-medium text-ink">{t("planCal")}</summary>
+      <p className="mt-2">{t("planCalText").replace("{f}", `${passName} · ${areaName}`).replace("{t}", six)}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a className="chip" href={webcal}>{t("planCalApple")}</a>
+        <a className="chip" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`} target="_blank" rel="noopener noreferrer">{t("planCalGoogle")}</a>
+        <button className="chip" onClick={copy}>{copied ? t("planCopied") : t("planCalCopy")}</button>
+      </div>
+      <p className="mt-2 break-all text-ink-3">{url}</p>
+    </details>
   );
 }
 

@@ -16,6 +16,7 @@ const resorts = db.resorts.map((r) => ({
   lat: r.lat, lon: r.lon, elevation_m: r.elevation_m, timezone: r.timezone,
   needs_review: !!r.needs_review, has_obs: withObs.has(r.id),
 }));
+const groups = parse(readFileSync(resolve(here, "../../data/region_groups.yaml"), "utf8")).groups;
 writeFileSync(resolve(here, "../lib/resorts.generated.json"),
-  JSON.stringify({ regions: db.regions, resorts }, null, 1));
+  JSON.stringify({ regions: db.regions, groups, resorts }, null, 1));
 console.log(`gen-resorts: ${resorts.length} resorts, ${db.regions.length} regions, ${withObs.size} with observations`);

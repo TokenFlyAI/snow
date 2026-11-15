@@ -179,6 +179,12 @@ const dict = {
   planShowMore: { zh: "显示更多", en: "Show more" },
   planShare: { zh: "复制链接", en: "Copy link" },
   planCopied: { zh: "已复制", en: "Copied" },
+  planCal: { zh: "把粉雪日加进手机日历", en: "Get powder days in your calendar" },
+  planCalText: { zh: "订阅「{f}」的粉雪日：提前 4 天以内、粉雪分 ≥ 60、≥{t} 的概率 ≥ 60% 的雪场和日子会出现在你的日历里，预报变差后自动消失。每 6 小时更新一次，不需要账号。日历的语言跟随本页的语言。", en: "Subscribe to powder days for {f}: a resort and day shows up in your calendar when it is 4 days out or less, with a powder score of 60+ and a 60 %+ chance of {t}+, and disappears if the forecast drops. Updated every 6 hours, no account needed. The calendar is in this page's language." },
+  planCalApple: { zh: "iPhone / Mac 日历", en: "Apple Calendar" },
+  planCalGoogle: { zh: "Google 日历", en: "Google Calendar" },
+  planCalCopy: { zh: "复制订阅链接", en: "Copy feed link" },
+  planAllAreas: { zh: "全部地区", en: "all areas" },
   planHow: { zh: "这些建议怎么来的", en: "How the advice works" },
   planHowText: { zh: "“去”：提前 2 天以内，集合预报 ≥{t} 的概率 ≥ 70%。“大概率值得”：40%–70%。提前 3 天以上概率已达 40% 的，建议等到前 2 天再定。用两个雪季的数据回测：照着预报挑日子和雪场，周末党的粉雪周末从 20 个里 2.4 个提高到 5 个。注意：概率还没有用实测校准，粉雪分的系数也是初始值。", en: "“Go”: 2 days out or less and an ensemble chance of {t}+ of at least 70 %. “Probably worth it”: 40–70 %. When the chance is already 40 % three or more days out, wait until two days before. Backtest over two winters: picking the day and the mountain from the forecast raised a weekend skier's powder weekends from 2.4 to 5 out of 20. Note: the probabilities are not yet calibrated against observations, and the score's constants are first guesses." },
 } as const;

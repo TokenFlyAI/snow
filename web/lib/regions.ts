@@ -1,28 +1,14 @@
+import generated from "./resorts.generated.json";
 import type { Lang } from "./i18n";
 
 /**
- * Larger areas made of the regions in data/resorts.yaml, for the rank and map filters.
+ * Larger areas made of the regions in data/resorts.yaml, for the rank, map and planner filters
+ * (data/region_groups.yaml; the calendar feeds use the same file).
  * A filter value is "all", a group id prefixed with "g:", or a single region id.
  */
 export interface RegionGroup { id: string; name: string; name_zh: string; regions: string[] }
 
-const US_WEST = ["tahoe", "sierra-south", "socal", "utah", "colorado", "southwest", "northern-rockies", "pnw", "alaska"];
-const US_EAST = ["northeast", "mid-atlantic", "midwest"];
-const CANADA = ["canada-west", "canada-east"];
-const ALPS = ["alps-fr", "alps-ch", "alps-at", "alps-it", "dolomites"];
-
-export const REGION_GROUPS: RegionGroup[] = [
-  { id: "na", name: "US + Canada", name_zh: "美国 + 加拿大", regions: [...US_WEST, ...US_EAST, ...CANADA] },
-  { id: "us", name: "United States", name_zh: "美国", regions: [...US_WEST, ...US_EAST] },
-  { id: "us-west", name: "US West", name_zh: "美国西部", regions: US_WEST },
-  { id: "us-east", name: "US East + Midwest", name_zh: "美国东部 + 中西部", regions: US_EAST },
-  { id: "canada", name: "Canada", name_zh: "加拿大", regions: CANADA },
-  { id: "west-na", name: "Western US + Canada", name_zh: "北美西部（美加）", regions: [...US_WEST, "canada-west"] },
-  { id: "europe", name: "Europe", name_zh: "欧洲", regions: [...ALPS, "pyrenees"] },
-  { id: "alps", name: "Alps", name_zh: "阿尔卑斯", regions: ALPS },
-  { id: "asia", name: "Japan + East Asia", name_zh: "日本 + 东亚", regions: ["japan", "east-asia"] },
-  { id: "south", name: "Southern Hemisphere", name_zh: "南半球", regions: ["australia", "new-zealand", "south-america"] },
-];
+export const REGION_GROUPS = (generated as unknown as { groups: RegionGroup[] }).groups;
 
 /** Does a resort in `region` pass the filter `value`? */
 export function inRegion(value: string, region: string): boolean {

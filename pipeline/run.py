@@ -37,6 +37,7 @@ from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
 from .publish.build import build_index, build_manifest, build_resort, split_daily
 from .publish.obs_docs import build_obs_docs
+from .publish.ics import write_feeds
 from .publish.planner import build_planner
 from .resorts import Resort, load_resorts
 from .state import DEFAULT_PREVIOUS, Previous, age_hours, parse_time
@@ -289,7 +290,12 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
     if archive_dir is not None:
         run_info["verification"] = publish_verification(out_dir, archive_dir, db.resorts, now, prev)
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
-    _write(out_dir / "planner.json", build_planner(db.regions, docs, now))
+    planner = build_planner(db.regions, docs, now)
+    _write(out_dir / "planner.json", planner)
+    try:
+        run_info["calendar_feeds"] = write_feeds(out_dir, planner, now)
+    except Exception as e:  # noqa: BLE001  feeds are an extra: never stop a publish
+        log.warning("calendar feeds not written: %s", e)
     # manifest is written last: its presence marks a complete run
     _write(out_dir / "manifest.json", build_manifest(now, status, len(docs), usage, ens_status, run_info, budget))
     log.info("published %d resorts (%d refreshed, %d carried over); this run ~%.0f weighted API calls %s; "

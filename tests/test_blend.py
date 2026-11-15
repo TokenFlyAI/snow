@@ -6,7 +6,7 @@ from pipeline.process.blend import (blend, daily_range, ensemble_agreement, ense
 
 
 def test_weights_change_with_lead_time():
-    ids = ["ncep_hrrr_conus", "ecmwf_ifs025", "gfs_global"]
+    ids = ["ncep_hrrr_conus", "ecmwf_ifs", "gfs_global"]
     w = weights_for(ids, np.array([6, 72, 200]))
     assert w[0, 0] > w[1, 0] > w[2, 0]      # short range: high resolution first
     assert w[0, 1] == 0 and w[1, 1] > w[2, 1]

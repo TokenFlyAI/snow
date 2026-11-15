@@ -39,7 +39,7 @@ def test_model_selection_by_region():
     jp = {m.id for m in models_for(make_resort(country="JP", state="Hokkaido", timezone="Asia/Tokyo"))}
     ca = {m.id for m in models_for(make_resort(country="CA", state="BC"))}
     ak = {m.id for m in models_for(make_resort(state="AK"))}
-    assert {"ncep_nbm_conus", "ncep_hrrr_conus", "ecmwf_ifs025"} <= us
+    assert {"ncep_nbm_conus", "ncep_hrrr_conus", "ecmwf_ifs"} <= us
     assert "jma_seamless" in jp and "ncep_nbm_conus" not in jp
     assert "gem_hrdps_continental" in ca and "ncep_hrrr_conus" not in ca
     assert "ncep_hrrr_conus" not in ak and "gfs_global" in ak

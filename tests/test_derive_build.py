@@ -63,7 +63,7 @@ def test_model_without_profile_borrows_snow_level_from_donor():
 def _mds():
     return [
         make_model_data("gfs_global", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=0.5),
-        make_model_data("ecmwf_ifs025", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0),
+        make_model_data("ecmwf_ifs", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0),
         make_model_data("ncep_hrrr_conus", n=312, start="2026-01-09T00", t_sea_level=6.0,
                         precip_mm_per_h=2.0, valid_hours=72),
     ]

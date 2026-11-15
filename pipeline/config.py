@@ -54,6 +54,9 @@ class ModelSpec:
     kind: str                       # global | regional | blend | ai
     countries: Optional[tuple[str, ...]] = None  # None = everywhere
     exclude_states: tuple[str, ...] = ()
+    # surface fields from this model, the pressure-level profile from another (the 9 km ECMWF has no
+    # pressure levels on Open-Meteo; its 0.25 deg version of the same run does)
+    profile_from: Optional[str] = None
 
 
 CONUS_EXCLUDE = ("AK", "HI")
@@ -61,7 +64,8 @@ ALPS = ("FR", "CH", "IT", "AT")
 NOT_NORTH_AMERICA = ("FR", "CH", "IT", "AT", "AD", "JP", "KR", "CN", "AU", "NZ", "CL")
 
 MODELS: tuple[ModelSpec, ...] = (
-    ModelSpec("ecmwf_ifs025", "ECMWF IFS", "global"),
+    # 9 km native grid: lower error than the 0.25 deg version (backtest: single model 0-7 %, less dry)
+    ModelSpec("ecmwf_ifs", "ECMWF IFS", "global", profile_from="ecmwf_ifs025"),
     ModelSpec("ecmwf_aifs025_single", "ECMWF AIFS", "ai"),
     ModelSpec("gfs_global", "GFS", "global"),
     ModelSpec("icon_seamless", "ICON", "global"),
@@ -107,7 +111,7 @@ def _regional_pick(resort: Resort) -> str:
 
 # Global models every standard-tier resort gets. The 2024-26 backtest (docs/phase3-backtest-results.md):
 # a blend of ECMWF + GFS only has 8-16 % more error than one of 5 models, ECMWF + GFS + NBM 3-6 %.
-STANDARD_GLOBAL = ("ecmwf_ifs025", "gfs_global", "icon_seamless", "gem_global")
+STANDARD_GLOBAL = ("ecmwf_ifs", "gfs_global", "icon_seamless", "gem_global")
 
 
 def models_for(resort: Resort, tier: str = "featured") -> list[ModelSpec]:
@@ -207,18 +211,29 @@ def call_weight(n_vars: float, n_days: int, n_locations: int = 1) -> float:
     return max(1.0, n_vars / 10.0) * max(1.0, n_days / 14.0) * n_locations
 
 
-def estimate_daily_calls(resorts: Iterable[Resort], featured: Iterable[str], n_hourly_vars: int) -> dict:
+def model_call_weight(spec: ModelSpec, n_hourly_vars: int, n_profile_vars: int, n_days: int,
+                      n_locations: int = 1) -> float:
+    """Weight of fetching one deterministic model: one request, or two when the profile comes from
+    another model (surface variables from one, pressure-level variables from the other)."""
+    if spec.profile_from:
+        return (call_weight(n_hourly_vars - n_profile_vars, n_days, n_locations)
+                + call_weight(n_profile_vars, n_days, n_locations))
+    return call_weight(n_hourly_vars, n_days, n_locations)
+
+
+def estimate_daily_calls(resorts: Iterable[Resort], featured: Iterable[str], n_hourly_vars: int,
+                         n_profile_vars: int = 0) -> dict:
     """Weighted Open-Meteo calls per day for the scheduled runs (4 a day)."""
     fset = set(featured)
-    det_w = call_weight(n_hourly_vars, FORECAST_DAYS + PAST_DAYS)
+    days = FORECAST_DAYS + PAST_DAYS
     out = {"featured_deterministic": 0.0, "standard_deterministic": 0.0, "ensembles": 0.0}
     for r in resorts:
         tier = "featured" if r.id in fset else "standard"
-        n = len(models_for(r, tier))
+        w = sum(model_call_weight(m, n_hourly_vars, n_profile_vars, days) for m in models_for(r, tier))
         if tier == "featured":
-            out["featured_deterministic"] += n * det_w * RUNS_PER_DAY
+            out["featured_deterministic"] += w * RUNS_PER_DAY
         else:
-            out["standard_deterministic"] += n * det_w
+            out["standard_deterministic"] += w
         out["ensembles"] += sum(call_weight(e.members, e.days) for e in ensembles_for(tier))
     out["total"] = sum(out.values())
     return {k: round(v, 1) for k, v in out.items()}
@@ -231,20 +246,20 @@ def estimate_daily_calls(resorts: Iterable[Resort], featured: Iterable[str], n_h
 BLEND_WEIGHTS: tuple[tuple[float, dict[str, float]], ...] = (
     (48, {
         "ncep_hrrr_conus": 3.0, "ncep_rrfs_conus": 2.5, "gem_hrdps_continental": 3.0,
-        "jma_seamless": 3.0, "ncep_nbm_conus": 3.0, "ecmwf_ifs025": 2.0,
+        "jma_seamless": 3.0, "ncep_nbm_conus": 3.0, "ecmwf_ifs": 2.0,
         "gfs_global": 1.5, "icon_seamless": 1.5, "gem_global": 1.0, "ecmwf_aifs025_single": 1.0,
         "meteofrance_seamless": 3.0, "meteoswiss_icon_seamless": 3.0,
         "ukmo_seamless": 1.5, "cma_grapes_global": 0.5,
     }),
     (120, {
-        "ncep_nbm_conus": 3.0, "ecmwf_ifs025": 3.0, "gfs_global": 2.0, "jma_seamless": 2.0,
+        "ncep_nbm_conus": 3.0, "ecmwf_ifs": 3.0, "gfs_global": 2.0, "jma_seamless": 2.0,
         "icon_seamless": 1.5, "ecmwf_aifs025_single": 1.5, "ncep_rrfs_conus": 1.0,
         "gem_hrdps_continental": 1.0, "gem_global": 1.0,
         "meteofrance_seamless": 2.0, "meteoswiss_icon_seamless": 2.0,
         "ukmo_seamless": 2.0, "cma_grapes_global": 0.5,
     }),
     (float("inf"), {
-        "ecmwf_ifs025": 3.0, "ncep_nbm_conus": 2.5, "gfs_global": 2.0,
+        "ecmwf_ifs": 3.0, "ncep_nbm_conus": 2.5, "gfs_global": 2.0,
         "ecmwf_aifs025_single": 2.0, "icon_seamless": 1.0, "gem_global": 1.0, "jma_seamless": 1.0,
         "ukmo_seamless": 1.5, "meteofrance_seamless": 0.5, "meteoswiss_icon_seamless": 0.5, "cma_grapes_global": 0.5,
     }),

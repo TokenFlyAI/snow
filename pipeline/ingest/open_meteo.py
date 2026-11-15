@@ -19,7 +19,8 @@ from typing import Iterable, Optional
 import httpx
 import numpy as np
 
-from ..config import API_PER_HOUR, API_PER_MINUTE, FORECAST_DAYS, PAST_DAYS, PRESSURE_LEVELS, ModelSpec, call_weight
+from ..config import (API_PER_HOUR, API_PER_MINUTE, FORECAST_DAYS, PAST_DAYS, PRESSURE_LEVELS, ModelSpec,
+                      call_weight, model_call_weight)
 from ..resorts import Resort
 
 log = logging.getLogger(__name__)
@@ -36,11 +37,16 @@ SURFACE_VARS = (
 LEVEL_VARS = ("temperature", "geopotential_height", "relative_humidity", "wind_speed")
 
 
+def profile_vars() -> list[str]:
+    return [f"{v}_{p}hPa" for v in LEVEL_VARS for p in PRESSURE_LEVELS]
+
+
 def hourly_vars() -> list[str]:
-    out = list(SURFACE_VARS)
-    for v in LEVEL_VARS:
-        out += [f"{v}_{p}hPa" for p in PRESSURE_LEVELS]
-    return out
+    return list(SURFACE_VARS) + profile_vars()
+
+
+def model_weight(spec: ModelSpec, n_days: int = FORECAST_DAYS + PAST_DAYS, n_locations: int = 1) -> float:
+    return model_call_weight(spec, len(hourly_vars()), len(profile_vars()), n_days, n_locations)
 
 
 @dataclass
@@ -168,15 +174,14 @@ def fetch_model(client: httpx.Client, spec: ModelSpec, resorts: Iterable[Resort]
     Raises OpenMeteoError if the model is unavailable; the caller drops it.
     """
     resorts = list(resorts)
-    variables = hourly_vars()
     out: dict[str, ModelData] = {}
-    for i in range(0, len(resorts), BATCH_SIZE):
-        batch = resorts[i:i + BATCH_SIZE]
+
+    def get(model_id: str, variables: list[str], batch: list[Resort]) -> list[dict]:
         params = {
             "latitude": ",".join(f"{r.lat:.4f}" for r in batch),
             "longitude": ",".join(f"{r.lon:.4f}" for r in batch),
             "elevation": ",".join("nan" for _ in batch),
-            "models": spec.id,
+            "models": model_id,
             "hourly": ",".join(variables),
             "forecast_days": forecast_days,
             "past_days": past_days,
@@ -188,11 +193,35 @@ def fetch_model(client: httpx.Client, spec: ModelSpec, resorts: Iterable[Resort]
         weight = call_weight(len(variables), forecast_days + past_days, len(batch))
         payloads = _request(client, params, weight=weight)
         if len(payloads) != len(batch):
-            raise OpenMeteoError(f"{spec.id}: expected {len(batch)} locations, got {len(payloads)}")
-        for r, p in zip(batch, payloads):
-            out[r.id] = parse_location(p, spec.id, r.id)
+            raise OpenMeteoError(f"{model_id}: expected {len(batch)} locations, got {len(payloads)}")
         record(usage, weight, kind)
+        return payloads
+
+    for i in range(0, len(resorts), BATCH_SIZE):
+        batch = resorts[i:i + BATCH_SIZE]
+        if spec.profile_from:
+            surface = get(spec.id, list(SURFACE_VARS), batch)
+            profile = get(spec.profile_from, profile_vars(), batch)
+            for r, ps, pp in zip(batch, surface, profile):
+                out[r.id] = with_profile(parse_location(ps, spec.id, r.id), parse_location(pp, spec.id, r.id))
+        else:
+            for r, p in zip(batch, get(spec.id, hourly_vars(), batch)):
+                out[r.id] = parse_location(p, spec.id, r.id)
     return out
+
+
+def with_profile(surface: ModelData, profile: ModelData) -> ModelData:
+    """Surface fields (and grid elevation) of one model, pressure levels of another, on the surface times."""
+    pos = np.searchsorted(profile.time, surface.time)
+    ok = pos < profile.time.shape[0]
+    ok[ok] &= profile.time[pos[ok]] == surface.time[ok]
+    for k, a in profile.v.items():
+        if k in surface.v and np.isfinite(surface.v[k]).any():
+            continue
+        b = np.full(surface.time.shape, np.nan)
+        b[ok] = a[pos[ok]]
+        surface.v[k] = b
+    return surface
 
 
 def make_client() -> httpx.Client:

@@ -30,7 +30,8 @@ from typing import Optional
 from .config import (API_PER_HOUR, DAILY_DAYS, ENSEMBLES, FORECAST_DAYS, FRESH_WITHIN_H, MODELS, OUTLOOK_WEEKS,
                      PAST_DAYS, STALE_AFTER_H, call_weight, current_slot, ensembles_for, estimate_daily_calls,
                      last_slot_time, load_featured, models_for, refresh_slot)
-from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, hourly_vars, make_client
+from .ingest.open_meteo import (ModelData, OpenMeteoError, fetch_model, hourly_vars, make_client, model_weight,
+                                profile_vars)
 from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
@@ -111,7 +112,7 @@ def task_weight(t: Task) -> float:
     """Weighted Open-Meteo calls this task adds to the run (requests are batched, weight is per location)."""
     w = 0.0
     if t.det:
-        w += len(models_for(t.resort, t.tier)) * call_weight(len(hourly_vars()), FORECAST_DAYS + PAST_DAYS)
+        w += sum(model_weight(m) for m in models_for(t.resort, t.tier))
     if t.ens:
         w += sum(call_weight(e.members, e.days) for e in ensembles_for(t.tier))
     return w
@@ -269,7 +270,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         log.error("only %d of %d resorts have a forecast: not publishing", len(docs), len(tasks))
         return 1
 
-    budget = estimate_daily_calls(db.resorts, featured, len(hourly_vars()))
+    budget = estimate_daily_calls(db.resorts, featured, len(hourly_vars()), len(profile_vars()))
     run_info = {
         "mode": mode, "slot_utc": current_slot(now.hour),
         "resorts": len(tasks), "featured": sum(t.tier == "featured" for t in tasks),

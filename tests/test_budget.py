@@ -13,7 +13,7 @@ def test_shipped_configuration_stays_under_the_daily_target():
     featured = load_featured()
     assert set(featured) <= {r.id for r in db.resorts}, "data/featured.yaml lists an unknown resort"
     assert len(featured) == len(set(featured))
-    est = estimate_daily_calls(db.resorts, featured, len(om.hourly_vars()))
+    est = estimate_daily_calls(db.resorts, featured, len(om.hourly_vars()), len(om.profile_vars()))
     assert est["total"] < API_DAILY_TARGET < API_DAILY_LIMIT, est
     assert est["total"] == pytest.approx(est["featured_deterministic"] + est["standard_deterministic"] + est["ensembles"], abs=0.5)
 
@@ -28,7 +28,7 @@ def test_call_weights_match_the_free_tier_rules():
 
 
 def test_standard_tier_gets_the_global_models_plus_one_regional_and_one_ensemble():
-    glob = {"ecmwf_ifs025", "gfs_global", "icon_seamless", "gem_global"}
+    glob = {"ecmwf_ifs", "gfs_global", "icon_seamless", "gem_global"}
     us = make_resort()
     assert {m.id for m in models_for(us, "standard")} == glob | {"ncep_nbm_conus"}
     assert len(models_for(us, "featured")) == 8
@@ -107,3 +107,36 @@ def test_rate_limiter_respects_the_hourly_limit():
     start = clock["t"]
     lim.acquire(100)                         # the hour is full: wait for the first call to age out
     assert clock["t"] - start >= 3600.0 - 10 * 61.0 - 1
+
+
+def test_ecmwf_9km_takes_its_profile_from_the_025_model():
+    """Surface fields from ecmwf_ifs (9 km, no pressure levels on Open-Meteo), levels from ecmwf_ifs025."""
+    import httpx
+    import numpy as np
+    from pipeline.config import FORECAST_DAYS, PAST_DAYS, ModelSpec
+    from tests.helpers import make_resort
+
+    seen = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        model, hourly = req.url.params["models"], req.url.params["hourly"].split(",")
+        seen.append((model, len(hourly)))
+        n = len(req.url.params["latitude"].split(","))
+        times = ["2026-01-10T00:00", "2026-01-10T01:00", "2026-01-10T02:00"]
+        body = [{"elevation": 2700.0 if model == "ecmwf_ifs" else 2000.0,
+                 "hourly": {"time": times, **{v: [1.0 if model == "ecmwf_ifs" else 7.0] * 3 for v in hourly}}}
+                for _ in range(n)]
+        return httpx.Response(200, json=body if n > 1 else body[0])
+
+    spec = ModelSpec("ecmwf_ifs", "ECMWF IFS", "global", profile_from="ecmwf_ifs025")
+    usage: dict = {}
+    with httpx.Client(transport=httpx.MockTransport(handler)) as c:
+        out = om.fetch_model(c, spec, [make_resort(id="a"), make_resort(id="b")], usage=usage)
+    assert seen == [("ecmwf_ifs", len(om.SURFACE_VARS)), ("ecmwf_ifs025", len(om.profile_vars()))]
+    md = out["a"]
+    assert md.model == "ecmwf_ifs" and md.grid_elevation == 2700.0          # 9 km grid cell
+    assert md.get("precipitation")[0] == 1.0 and md.get("temperature_850hPa")[0] == 7.0
+    assert np.isfinite(md.level_stack("geopotential_height")).all()
+    # two requests cost about what one request with all variables did
+    assert usage["weighted_calls"] == pytest.approx(om.model_weight(spec, FORECAST_DAYS + PAST_DAYS, 2))
+    assert om.model_weight(spec) == pytest.approx(call_weight(9, 13) + call_weight(20, 13))

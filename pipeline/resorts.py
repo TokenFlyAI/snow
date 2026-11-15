@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "data" / "resorts.yaml"
 
 PassName = Literal["ikon", "epic"]
-PassTier = Literal["unlimited", "7day", "5day", "2day"]
+PassTier = Literal["unlimited", "7day", "5day", "3day", "2day"]
 LEVELS = ("base", "mid", "summit")
 
 

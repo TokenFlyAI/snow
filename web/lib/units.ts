@@ -55,3 +55,12 @@ export function fmtPrecip(mm: number | null | undefined, u: Units): string {
   if (v === null) return dash;
   return u === "imperial" ? `${v.toFixed(2)}″` : `${v < 10 ? v.toFixed(1) : Math.round(v)} mm`;
 }
+
+/** Snowfall thresholds are defined in cm (2.5, 15, 30, 60); imperial shows the round inch value. */
+export function fmtThreshold(cm: number | string, u: Units): string {
+  const v = Number(cm);
+  return u === "imperial" ? `${Math.round(v / 2.54)}″` : `${v} cm`;
+}
+
+/** Threshold keys ("2.5", "15", ...) in ascending order. JS puts integer-like keys first, so sort explicitly. */
+export const thresholdKeys = (prob: Record<string, unknown>): string[] => Object.keys(prob).sort((a, b) => Number(a) - Number(b));

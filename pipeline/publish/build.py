@@ -6,9 +6,12 @@ from typing import Optional
 
 import numpy as np
 
-from ..config import FORECAST_DAYS, HOURLY_HORIZON_H, MODEL_BY_ID, SCHEMA_VERSION, SOURCES
+from ..config import (API_DAILY_LIMIT, API_DAILY_TARGET, DAILY_DAYS, ENSEMBLE_BY_ID, HOURLY_HORIZON_H, MODEL_BY_ID, NIGHT_START_H,
+                      OUTLOOK_WEEKS, POINT_DAYS, SCHEMA_VERSION, SOURCES)
 from ..process import aggregate
-from ..process.blend import blend, confidence, weighted_quantile, weights_for
+from ..process import ensemble as ens
+from ..process.blend import (blend, daily_range, ensemble_agreement, ensemble_confidence, model_spread_confidence,
+                             weights_for)
 from ..process.derive import Derived
 from ..process.slr import snow_quality
 from ..process.snowlevel import precip_type
@@ -44,8 +47,9 @@ def _reindex(a: np.ndarray, src: np.ndarray, ref: np.ndarray) -> np.ndarray:
     return out
 
 
-def resort_meta(resort: Resort) -> dict:
+def resort_meta(resort: Resort, tier: str = "standard") -> dict:
     return {
+        "tier": tier,
         "id": resort.id, "name": resort.name, "name_zh": resort.name_zh,
         "destination": resort.destination, "passes": dict(resort.passes),
         "country": resort.country, "state": resort.state, "region": resort.region,
@@ -55,8 +59,27 @@ def resort_meta(resort: Resort) -> dict:
     }
 
 
+def _pct(x) -> Optional[float]:
+    return None if x is None or not np.isfinite(x) else round(float(x), 2)
+
+
+def _stats_by_level(values: np.ndarray, weights: np.ndarray, ratios: dict[str, float], thresholds) -> Optional[dict]:
+    """Percentiles and probabilities of one day / window at the three elevations."""
+    mid = ens.stats(values, weights, thresholds)
+    if not mid.ok:
+        return None
+    by = {lv: ens.stats(values * ratios[lv], weights, thresholds) for lv in LEVELS}
+    return {
+        "p10": {lv: _r(by[lv].p10) for lv in LEVELS}, "p50": {lv: _r(by[lv].p50) for lv in LEVELS},
+        "p90": {lv: _r(by[lv].p90) for lv in LEVELS}, "mean": {lv: _r(by[lv].mean) for lv in LEVELS},
+        "prob": {f"{t:g}": {lv: _pct(by[lv].prob[t]) for lv in LEVELS} for t in thresholds},
+        "n_members": mid.n_members,
+    }
+
+
 def build_resort(resort: Resort, derived: list[Derived], now: datetime,
-                 missing_models: Optional[list[str]] = None) -> dict:
+                 missing_models: Optional[list[str]] = None, ens_raw: Optional[dict] = None,
+                 tier: str = "standard") -> dict:
     if not derived:
         raise ValueError(f"{resort.id}: no model data")
     ref = max((d.time for d in derived), key=lambda t: t.shape[0])
@@ -105,45 +128,41 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
         "visibility_m": _list(vis[sl_], 0),
     }
 
-    # ---- daily block: 16 ski days --------------------------------------------
+    # ---- daily block ------------------------------------------------------------
+    # ski days D+0 .. D+9: point values from the blend, range + confidence from the ensembles
+    # ski days D+10 .. D+15: ensemble probabilities only
     idx = aggregate.index_hours(ref, resort.timezone)
     today = now.astimezone(idx.local_start[0].tzinfo).date()
-    daily = []
+    dates = [today + timedelta(days=k) for k in range(max(DAILY_DAYS, 7 * max(OUTLOOK_WEEKS)))]
+    point: list[dict] = []
+    per_day_models: list[tuple[dict, np.ndarray]] = []       # ({level: per-model totals}, weights)
     by_model: dict[str, dict[str, list]] = {m: {lv: [] for lv in LEVELS} for m in ids}
-    for k in range(FORECAST_DAYS):
-        d = today + timedelta(days=k)
+    slr_by_day = np.full(len(dates), np.nan)
+    for k in range(POINT_DAYS):
+        d = dates[k]
         night, day, cal = aggregate.day_masks(idx, d)
         ski = night | day
         if not ski.any():
             break
-        w_day = W[:, ski].mean(axis=1) if ski.any() else np.ones(len(ids))
-        entry: dict = {"date": d.isoformat(), "lead_days": k}
-        snow_night, snow_day, total, low, high = {}, {}, {}, {}, {}
-        model_totals_mid = []
+        w_day = W[:, ski].mean(axis=1)
+        entry: dict = {"date": d.isoformat(), "lead_days": k, "kind": "point"}
+        snow_night, snow_day, total, per = {}, {}, {}, {}
         for lv in LEVELS:
             n_ = aggregate.window_sum(snow[lv], night)
             d_ = aggregate.window_sum(snow[lv], day)
             tot = n_ + d_ if np.isfinite(n_) and np.isfinite(d_) else float("nan")
-            per_model = [aggregate.window_sum(snow_stack[lv][i], ski, min_coverage=0.9) for i in range(len(ids))]
-            for m, v in zip(ids, per_model):
-                by_model[m][lv].append(_r(v))
-            lo = weighted_quantile(per_model, w_day, 0.1)
-            hi = weighted_quantile(per_model, w_day, 0.9)
-            if np.isfinite(tot):
-                lo = min(lo, tot) if np.isfinite(lo) else tot
-                hi = max(hi, tot) if np.isfinite(hi) else tot
-            snow_night[lv], snow_day[lv], total[lv], low[lv], high[lv] = _r(n_), _r(d_), _r(tot), _r(lo), _r(hi)
-            if lv == "mid":
-                model_totals_mid = per_model
+            per[lv] = [aggregate.window_sum(snow_stack[lv][i], ski, min_coverage=0.9) for i in range(len(ids))]
+            snow_night[lv], snow_day[lv], total[lv] = _r(n_), _r(d_), _r(tot)
         if total["mid"] is None:
             break  # beyond every model's horizon
+        for lv in LEVELS:
+            for m, v in zip(ids, per[lv]):
+                by_model[m][lv].append(_r(v))
+        per_day_models.append((per, w_day))
         entry["snow_night_cm"] = snow_night
         entry["snow_day_cm"] = snow_day
         entry["snow_cm"] = total
-        entry["snow_low_cm"] = low
-        entry["snow_high_cm"] = high
-        entry["n_models"] = int(np.isfinite(model_totals_mid).sum())
-        entry["confidence"] = confidence(model_totals_mid, w_day, k)
+        entry["n_models"] = int(np.isfinite(per["mid"]).sum())
         entry["precip_mm"] = _r(aggregate.window_sum(precip, ski))
         entry["rain_base_mm"] = _r(aggregate.window_sum(rain["base"], ski))
         entry["temp_max_c"] = {lv: _r(aggregate.window_stat(temp[lv], cal, np.max)) for lv in ("base", "summit")}
@@ -159,28 +178,136 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
         entry["gust_max_kmh"] = _r(aggregate.window_stat(gust, day if day.any() else cal, np.max), 0)
         entry["wind_avg_kmh"] = _r(aggregate.window_stat(wind, day if day.any() else cal, np.mean), 0)
         entry["cloud_pct"] = _r(aggregate.window_stat(cloud, day if day.any() else cal, np.mean), 0)
+        slr_by_day[k] = aggregate.window_stat(slr_mid, ski, np.mean)
         s_mid = np.where(ski, np.nan_to_num(snow["mid"]), 0.0)
         if s_mid.sum() >= 0.5:
             slr_day = float(np.nansum(slr_mid * s_mid) / s_mid.sum())
+            slr_by_day[k] = slr_day
             entry["slr"] = _r(slr_day)
             entry["quality"] = snow_quality(slr_day)
         else:
             entry["slr"] = None
             entry["quality"] = "none"
-        daily.append(entry)
-    n_days = len(daily)
+        point.append(entry)
+    n_point = len(point)
+
+    # ---- ensembles: calibrate against the blend, then percentiles / probabilities ----
+    pool = ens.Pool.from_raw(ens_raw, dates)
+    blend_mid = np.full(len(dates), np.nan)
+    blend_mid[:n_point] = [e["snow_cm"]["mid"] for e in point]
+    values, cal_info = ens.calibrate(pool, slr_by_day, blend_mid)
+    weights = pool.weights
+
+    def tot_lv(lv: str, days: range) -> float:
+        return float(sum(point[k]["snow_cm"][lv] or 0.0 for k in days if k < n_point))
+
+    # elevation ratio of the whole point period, used where a single day gives no information
+    period_ratio = {lv: ens.level_ratio(tot_lv(lv, range(n_point)), tot_lv("mid", range(n_point))) for lv in LEVELS}
+    if tot_lv("mid", range(n_point)) < 5.0:
+        period_ratio = {lv: 1.0 for lv in LEVELS}
+
+    def day_ratio(k: int) -> dict[str, float]:
+        if k < n_point and (point[k]["snow_cm"]["mid"] or 0.0) >= 1.0:
+            return {lv: ens.level_ratio(point[k]["snow_cm"][lv] or 0.0, point[k]["snow_cm"]["mid"]) for lv in LEVELS}
+        return period_ratio
+
+    daily: list[dict] = []
+    for k in range(DAILY_DAYS):
+        st = _stats_by_level(values[:, k], weights, day_ratio(k), ens.DAY_THRESHOLDS_CM) if pool.n_members else None
+        if k < n_point:
+            entry = point[k]
+            per, w_day = per_day_models[k]
+            low, high, source = {}, {}, "models"
+            for lv in LEVELS:
+                e_lo = st["p10"][lv] if st else None
+                e_hi = st["p90"][lv] if st else None
+                tot = entry["snow_cm"][lv]
+                lo, hi, source = daily_range(tot if tot is not None else float("nan"),
+                                             e_lo if e_lo is not None else float("nan"),
+                                             e_hi if e_hi is not None else float("nan"), per[lv], w_day)
+                low[lv], high[lv] = _r(lo), _r(hi)
+            entry["snow_low_cm"], entry["snow_high_cm"], entry["range_source"] = low, high, source
+            if st:
+                agree = ensemble_agreement(entry["snow_cm"]["mid"], values[:, k], weights)
+                st["agreement"] = _pct(agree)
+                entry["confidence"] = ensemble_confidence(agree, k)
+            else:
+                entry["confidence"] = model_spread_confidence(per["mid"], w_day, k)
+            entry["ens"] = st
+            daily.append(entry)
+        elif st:
+            daily.append({"date": dates[k].isoformat(), "lead_days": k, "kind": "prob", "ens": st})
     for m in ids:
         for lv in LEVELS:
-            by_model[m][lv] = by_model[m][lv][:n_days]
+            by_model[m][lv] = by_model[m][lv][:n_point]
+
+    # ---- weekly outlook (weeks 3-5), mid-mountain, probabilities only ----------------
+    outlook = []
+    for wk in OUTLOOK_WEEKS:
+        days = range(7 * (wk - 1), 7 * wk)
+        if not pool.n_members or days[-1] >= len(dates):
+            continue
+        tot = ens.window_totals(values, days)
+        st = ens.stats(tot, weights, ens.WEEK_THRESHOLDS_CM)
+        if not st.ok:
+            continue
+        used = np.isfinite(tot)
+        outlook.append({
+            "week": wk, "start": dates[days[0]].isoformat(), "end": dates[days[-1]].isoformat(),
+            "p10_cm": _r(st.p10), "p50_cm": _r(st.p50), "p90_cm": _r(st.p90), "mean_cm": _r(st.mean),
+            "prob": {f"{t:g}": _pct(st.prob[t]) for t in ens.WEEK_THRESHOLDS_CM},
+            "n_members": st.n_members,
+            "models": [m for m in pool.labels if any(u and x == m for u, x in zip(used, pool.model_of))],
+        })
 
     # ---- summary ---------------------------------------------------------------
     summary: dict = {}
-    for label, hours in (("24h", 24), ("72h", 72), ("7d", 168), ("16d", 10 ** 6)):
+    for label, hours in (("24h", 24), ("72h", 72), ("7d", 168)):
         mask = (lead > 0) & (lead <= hours)
         summary[f"snow_{label}_cm"] = {lv: _r(float(np.nansum(snow[lv][mask]))) for lv in LEVELS}
-    nxt = next((e for e in daily if (e["snow_cm"]["mid"] or 0) >= NEXT_SNOW_MIN_CM), None)
+    # ski-day totals (today's ski day started at 16:00 yesterday) with the ensemble range;
+    # days without a point value contribute the ensemble mean
+    fill = {0: blend_mid[0]} if n_point else None
+    totals = {}
+    for label, n_days in (("3d", 3), ("7d", 7), ("16d", DAILY_DAYS)):
+        cm = {}
+        for lv in LEVELS:
+            x = tot_lv(lv, range(n_days))
+            for e in daily[n_point:n_days]:
+                x += e["ens"]["mean"][lv] or 0.0
+            cm[lv] = x
+        complete = len(daily) >= n_days
+        ratios = {lv: ens.level_ratio(cm[lv], cm["mid"]) for lv in LEVELS}
+        st = None
+        if pool.n_members:
+            st = _stats_by_level(ens.window_totals(values, range(n_days), fill=fill), weights, ratios, ())
+        totals[label] = {
+            "cm": {lv: _r(cm[lv]) for lv in LEVELS},
+            "low_cm": {lv: _r(min(st["p10"][lv], cm[lv])) for lv in LEVELS} if st else None,
+            "high_cm": {lv: _r(max(st["p90"][lv], cm[lv])) for lv in LEVELS} if st else None,
+            "days": min(n_days, len(daily)), "complete": complete,
+        }
+    summary["totals"] = totals
+    summary["snow_16d_cm"] = totals["16d"]["cm"]
+    # today's ski day ends at 16:00 local time: after that its snow is no longer "next"
+    over = now.astimezone(idx.local_start[0].tzinfo).hour >= NIGHT_START_H
+    nxt = next((e for e in point if (e["snow_cm"]["mid"] or 0) >= NEXT_SNOW_MIN_CM
+                and not (over and e["lead_days"] == 0)), None)
     summary["next_snow"] = {"date": nxt["date"], "snow_cm": nxt["snow_cm"]} if nxt else None
-    summary["daily_mid_cm"] = [e["snow_cm"]["mid"] for e in daily]
+    summary["daily_mid_cm"] = [e["snow_cm"]["mid"] for e in point]
+
+    ensemble_info = None
+    if pool.n_members:
+        ensemble_info = {
+            "generated_at": ens_raw.get("generated_at"),
+            "level": "mid", "elevation_m": ens_raw.get("elevation_m"),
+            "models": [{"id": mid, "label": pool.labels.get(mid, mid),
+                        "members": sum(1 for x in pool.model_of if x == mid),
+                        "horizon_days": int(np.flatnonzero(np.isfinite(values[[i for i, x in enumerate(pool.model_of) if x == mid]]).any(axis=0)).max()) + 1}
+                       for mid in pool.models_on(range(len(dates)))],
+            "calibration": {"factor": cal_info.factor, "slr_default": cal_info.slr_default, "days": cal_info.n_days,
+                            "blend_cm": cal_info.blend_cm, "ensemble_cm": cal_info.ensemble_cm},
+        }
 
     models = []
     for d in derived:
@@ -201,12 +328,14 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "resort": resort_meta(resort),
+        "resort": resort_meta(resort, tier),
         "units": {"snow": "cm", "precip": "mm", "temp": "C", "height": "m", "wind": "km/h"},
         "models": models,
+        "ensemble": ensemble_info,
         "summary": summary,
         "hourly": hourly,
         "daily": daily,
+        "outlook": outlook,
         "by_model_daily_cm": by_model,
     }
 
@@ -216,20 +345,32 @@ def build_index(regions: list[Region], docs: list[dict], now: datetime) -> dict:
         "schema_version": SCHEMA_VERSION,
         "generated_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "regions": [r.model_dump() for r in regions],
-        "resorts": [{**d["resort"], "summary": d["summary"],
-                     "dates": [e["date"] for e in d["daily"]],
-                     "n_models": sum(1 for m in d["models"] if m["status"] == "ok")} for d in docs],
+        "resorts": [{**d["resort"], "generated_at": d["generated_at"],
+                     "ensemble_at": (d.get("ensemble") or {}).get("generated_at"), "summary": d["summary"],
+                     "dates": [e["date"] for e in d["daily"] if e.get("kind") == "point"],
+                     "n_models": sum(1 for m in d["models"] if m["status"] == "ok"),
+                     "n_members": sum(m["members"] for m in (d.get("ensemble") or {}).get("models", [])),
+                     "outlook": [{"week": o["week"], "p50_cm": o["p50_cm"], "prob": o["prob"]} for o in d.get("outlook", [])]}
+                    for d in docs],
     }
 
 
-def build_manifest(now: datetime, model_status: dict[str, dict], n_resorts: int, usage: dict) -> dict:
+def build_manifest(now: datetime, model_status: dict[str, dict], n_resorts: int, usage: dict,
+                   ensemble_status: Optional[dict[str, dict]] = None, run: Optional[dict] = None,
+                   budget: Optional[dict] = None) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "resort_count": n_resorts,
+        "run": run or {},
         "models": [{"id": k, **v} for k, v in model_status.items()],
+        "ensembles": [{"id": k, **v} for k, v in (ensemble_status or {}).items()],
         "api_usage": {"requests": usage.get("requests", 0),
-                      "weighted_calls": round(usage.get("weighted_calls", 0.0), 1)},
+                      "weighted_calls": round(usage.get("weighted_calls", 0.0), 1),
+                      "by_kind": {k: round(v, 1) for k, v in usage.get("by_kind", {}).items()},
+                      "daily_estimate": budget or {},
+                      "daily_limit": API_DAILY_LIMIT, "daily_target": API_DAILY_TARGET},
         "sources": SOURCES,
-        "attribution": "Weather data by Open-Meteo.com (CC BY 4.0); model data from ECMWF, NOAA, DWD, ECCC, JMA.",
+        "attribution": "Weather data by Open-Meteo.com (CC BY 4.0); model data from ECMWF, NOAA, DWD, ECCC, JMA, "
+                       "Météo-France, MeteoSwiss, UK Met Office, CMA.",
     }

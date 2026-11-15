@@ -60,30 +60,37 @@ def test_model_without_profile_borrows_snow_level_from_donor():
     assert make_donor([alone]) is None
 
 
-def test_build_resort_document_shape_and_dropout():
-    r = make_resort()
-    mds = [
-        make_model_data("gfs_global", n=408, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=0.5),
-        make_model_data("ecmwf_ifs025", n=408, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0),
-        make_model_data("ncep_hrrr_conus", n=408, start="2026-01-09T00", t_sea_level=6.0,
+def _mds():
+    return [
+        make_model_data("gfs_global", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=0.5),
+        make_model_data("ecmwf_ifs025", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0),
+        make_model_data("ncep_hrrr_conus", n=312, start="2026-01-09T00", t_sea_level=6.0,
                         precip_mm_per_h=2.0, valid_hours=72),
     ]
-    derived = [derive(m, r) for m in mds]
+
+
+def test_build_resort_document_shape_and_dropout():
+    r = make_resort()
+    derived = [derive(m, r) for m in _mds()]
     doc = build_resort(r, derived, NOW, missing_models=["ncep_nbm_conus"])
     json.dumps(doc, allow_nan=False)                    # no NaN may leak into the published JSON
 
     assert len(doc["hourly"]["time"]) == 168
     assert doc["hourly"]["time"][0] == "2026-01-10T07:00Z"
-    assert len(doc["daily"]) == 16
+    assert len(doc["daily"]) == 10                      # point values stop after ski day D+9
+    assert all(e["kind"] == "point" for e in doc["daily"])
     assert doc["daily"][0]["date"] == "2026-01-09"      # 06:00 UTC is still Jan 9 in California
     day = doc["daily"][5]                               # past the HRRR horizon: constant weights
     assert day["snow_cm"]["mid"] == pytest.approx(day["snow_night_cm"]["mid"] + day["snow_day_cm"]["mid"], abs=0.15)
     assert day["snow_night_cm"]["mid"] == pytest.approx(2 * day["snow_day_cm"]["mid"], rel=0.05)  # 16 h vs 8 h
     assert day["snow_low_cm"]["mid"] <= day["snow_cm"]["mid"] <= day["snow_high_cm"]["mid"]
     assert day["quality"] in {"powder", "packed", "heavy"}
+    # without ensemble data the range and confidence fall back to the model spread
+    assert day["range_source"] == "models" and day["ens"] is None
+    assert doc["ensemble"] is None and doc["outlook"] == []
 
     by = doc["by_model_daily_cm"]
-    assert all(len(by[m][lv]) == 16 for m in by for lv in LEVELS)
+    assert all(len(by[m][lv]) == 10 for m in by for lv in LEVELS)
     assert by["ncep_hrrr_conus"]["mid"][1] is not None and by["ncep_hrrr_conus"]["mid"][8] is None
     assert doc["daily"][8]["n_models"] == 2 and doc["daily"][8]["snow_cm"]["mid"] is not None
 
@@ -95,13 +102,84 @@ def test_build_resort_document_shape_and_dropout():
     s = doc["summary"]
     assert s["snow_24h_cm"]["mid"] < s["snow_72h_cm"]["mid"] < s["snow_7d_cm"]["mid"] < s["snow_16d_cm"]["mid"]
     assert s["snow_24h_cm"]["summit"] >= s["snow_24h_cm"]["base"]
-    assert s["next_snow"]["date"] == doc["daily"][0]["date"]
+    # 22:00 local: the ski day of Jan 9 ended at 16:00, so the next snow is the Jan 10 ski day (already running)
+    assert s["next_snow"]["date"] == doc["daily"][1]["date"] == "2026-01-10"
+    morning = build_resort(r, derived, datetime(2026, 1, 9, 15, 0, tzinfo=timezone.utc))   # 07:00 in California
+    assert morning["summary"]["next_snow"]["date"] == morning["daily"][0]["date"] == "2026-01-09"
+    t = s["totals"]
+    assert t["3d"]["cm"]["mid"] < t["7d"]["cm"]["mid"] and t["3d"]["low_cm"] is None
+    assert t["16d"]["complete"] is False                # no ensemble -> nothing beyond day 10
+
+
+def _ens_raw(start="2026-01-09", n_days=35, members=20, daily_cm=20.0, spread=True):
+    """A synthetic ens/{id}.json: member i gets (i / mean) x daily_cm every day."""
+    rows = []
+    for i in range(members):
+        f = (2.0 * i / (members - 1)) if spread else 1.0
+        rows.append([round(daily_cm * f, 1)] * n_days)
+    return {"schema_version": 2, "generated_at": "2026-01-10T05:00:00Z", "resort_id": "test-mountain",
+            "elevation_m": 2300, "start_date": start,
+            "models": {"gfs05": {"label": "GEFS", "weight": 1.0, "members": members, "daily": rows}}}
+
+
+def test_build_resort_with_ensemble_publishes_ranges_probabilities_and_outlook():
+    r = make_resort()
+    derived = [derive(m, r) for m in _mds()]
+    doc = build_resort(r, derived, NOW, ens_raw=_ens_raw(), tier="featured")
+    json.dumps(doc, allow_nan=False)
+    assert doc["resort"]["tier"] == "featured"
+
+    daily = doc["daily"]
+    assert [e["kind"] for e in daily] == ["point"] * 10 + ["prob"] * 6
+    # beyond day 10 there is no point value, only percentiles and probabilities
+    far = daily[12]
+    assert "snow_cm" not in far and set(far["ens"]["prob"]) == {"2.5", "15"}
+    assert 0.0 <= far["ens"]["prob"]["15"]["mid"] <= far["ens"]["prob"]["2.5"]["mid"] <= 1.0
+    assert far["ens"]["p10"]["mid"] <= far["ens"]["p50"]["mid"] <= far["ens"]["p90"]["mid"]
+    assert far["ens"]["n_members"] == 20
+
+    day = daily[5]
+    assert day["range_source"] == "ensemble"
+    assert day["snow_low_cm"]["mid"] <= day["snow_cm"]["mid"] <= day["snow_high_cm"]["mid"]
+    assert day["snow_low_cm"]["mid"] < day["snow_high_cm"]["mid"]
+    assert day["confidence"] in {"high", "medium", "low"} and 0.0 <= day["ens"]["agreement"] <= 1.0
+
+    # the ensemble is calibrated so that its mean matches the blend over the point period
+    cal = doc["ensemble"]["calibration"]
+    assert cal["days"] == 10 and cal["blend_cm"] > 0
+    blend_total = sum(e["snow_cm"]["mid"] for e in daily[:10])
+    ens_total = sum(e["ens"]["mean"]["mid"] for e in daily[:10])
+    assert ens_total == pytest.approx(blend_total, rel=0.03)
+    assert doc["ensemble"]["models"] == [{"id": "gfs05", "label": "GEFS", "members": 20, "horizon_days": 35}]
+
+    out = doc["outlook"]
+    assert [o["week"] for o in out] == [3, 4, 5]
+    assert out[0]["start"] == "2026-01-23" and out[0]["end"] == "2026-01-29"
+    for o in out:
+        assert o["p10_cm"] <= o["p50_cm"] <= o["p90_cm"] and o["models"] == ["gfs05"]
+        assert 1.0 >= o["prob"]["15"] >= o["prob"]["30"] >= o["prob"]["60"] >= 0.0
+
+    t = doc["summary"]["totals"]
+    assert t["16d"]["complete"] and t["16d"]["cm"]["mid"] > t["7d"]["cm"]["mid"] > t["3d"]["cm"]["mid"]
+    for k in ("3d", "7d", "16d"):
+        assert t[k]["low_cm"]["mid"] <= t[k]["cm"]["mid"] <= t[k]["high_cm"]["mid"]
+    assert doc["summary"]["snow_16d_cm"] == t["16d"]["cm"]
+
+
+def test_stale_ensemble_file_is_realigned_by_date():
+    r = make_resort()
+    derived = [derive(m, r) for m in _mds()]
+    # the cached member totals start two days before "today": the first two days are simply dropped
+    doc = build_resort(r, derived, NOW, ens_raw=_ens_raw(start="2026-01-07"))
+    assert doc["daily"][0]["ens"]["n_members"] == 20
+    assert len(doc["daily"]) == 16
+    assert [o["week"] for o in doc["outlook"]] == [3, 4]     # week 5 is no longer covered
 
 
 def test_high_resolution_model_dominates_early_then_drops_out():
     r = make_resort()
-    lo = derive(make_model_data("gfs_global", n=408, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0), r)
-    hi = derive(make_model_data("ncep_hrrr_conus", n=408, start="2026-01-09T00", t_sea_level=6.0,
+    lo = derive(make_model_data("gfs_global", n=312, start="2026-01-09T00", t_sea_level=6.0, precip_mm_per_h=1.0), r)
+    hi = derive(make_model_data("ncep_hrrr_conus", n=312, start="2026-01-09T00", t_sea_level=6.0,
                                 precip_mm_per_h=3.0, valid_hours=72), r)
     h = build_resort(r, [lo, hi], NOW)["hourly"]["precip_mm"]
     assert h[0] == pytest.approx((1.0 * 1.5 + 3.0 * 3.0) / 4.5, abs=0.01)   # 0-48 h weights 1.5 : 3
@@ -111,11 +189,20 @@ def test_high_resolution_model_dominates_early_then_drops_out():
 def test_index_and_manifest():
     db = load_resorts()
     r = make_resort()
-    doc = build_resort(r, [derive(make_model_data(n=408, start="2026-01-09T00", precip_mm_per_h=0.2), r)], NOW)
+    doc = build_resort(r, [derive(make_model_data(n=312, start="2026-01-09T00", precip_mm_per_h=0.2), r)], NOW,
+                       ens_raw=_ens_raw())
     index = build_index(db.regions, [doc], NOW)
-    assert index["resorts"][0]["id"] == "test-mountain" and len(index["resorts"][0]["dates"]) == 16
-    man = build_manifest(NOW, {"gfs_global": {"label": "GFS", "status": "ok"}}, 1, {"requests": 3, "weighted_calls": 12.34})
+    row = index["resorts"][0]
+    assert row["id"] == "test-mountain" and len(row["dates"]) == 10
+    assert row["tier"] == "standard" and row["n_members"] == 20
+    assert row["generated_at"] == "2026-01-10T06:00:00Z" and row["ensemble_at"] == "2026-01-10T05:00:00Z"
+    assert [o["week"] for o in row["outlook"]] == [3, 4, 5]
+    man = build_manifest(NOW, {"gfs_global": {"label": "GFS", "status": "ok"}}, 1,
+                         {"requests": 3, "weighted_calls": 12.34, "by_kind": {"ensemble": 7.75}},
+                         {"gfs05": {"label": "GEFS", "status": "ok"}}, {"mode": "auto"}, {"total": 7000.0})
     assert man["generated_at"] == "2026-01-10T06:00:00Z" and man["api_usage"]["weighted_calls"] == 12.3
+    assert man["api_usage"]["daily_estimate"]["total"] == 7000.0 and man["api_usage"]["daily_target"] == 8000
+    assert man["ensembles"][0]["id"] == "gfs05" and man["run"]["mode"] == "auto"
     assert "Open-Meteo" in man["attribution"]
     json.dumps([index, man], allow_nan=False)
 

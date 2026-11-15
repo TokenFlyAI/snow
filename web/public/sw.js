@@ -3,11 +3,11 @@
  *  - hashed assets:    cache first (immutable file names)
  *  - forecast JSON:    stale-while-revalidate (instant paint, refresh in the background)
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `snow-shell-${VERSION}`;
 const DATA = `snow-data-${VERSION}`;
 const SCOPE = new URL(self.registration.scope).pathname;          // "/snow/"
-const PRECACHE = ["", "resorts/", "about/", "manifest.webmanifest", "icon.svg"].map((p) => SCOPE + p);
+const PRECACHE = ["", "resorts/", "map/", "rank/", "about/", "manifest.webmanifest", "icon.svg"].map((p) => SCOPE + p);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)).catch(() => undefined).then(() => self.skipWaiting()));

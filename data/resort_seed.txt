@@ -1,0 +1,252 @@
+# Seed list for scripts/build_resorts.py  ->  data/resorts.yaml
+#
+# Pass lists checked on 2026-11-11 against
+#   https://www.ikonpass.com/en/shop-passes/ikon-pass   (26/27 Ikon Pass: 18 unlimited, 7 days elsewhere, 14 bonus mountains)
+#   https://www.epicpass.com/passes/epic-pass.aspx       (2026/27 Epic Pass) and /regions/europe.aspx
+#
+# One line per forecast point:
+#   id | name | name_zh | destination | pass:tier | country | state | region | lat | lon | base | summit | options
+# lat/lon here are only approximate search centres; the build script replaces them
+# with the OpenStreetMap centroid. base/summit are published figures written from
+# memory; the build script checks them against Wikipedia and against OSM lifts on a DEM.
+# A trailing "?" on an elevation means "rough guess, prefer the measured value".
+# options: tz=..., r=<km search radius>, osm=<name hint>, wiki=<article title>
+#
+# The ten phase-1 resorts stay hand-maintained in data/resorts.yaml and are not listed here.
+
+# ---------------------------------------------------------------- Ikon: US Rockies
+arapahoe-basin | Arapahoe Basin | 阿拉帕霍盆地 | | ikon:unlimited | US | CO | colorado | 39.6425 | -105.8719 | 3286 | 3978 |
+aspen-mountain | Aspen Mountain | 阿斯彭山 | aspen-snowmass | ikon:7day | US | CO | colorado | 39.1820 | -106.8190 | 2422 | 3418 | wiki=Aspen Mountain (ski area); r=2
+aspen-highlands | Aspen Highlands | 阿斯彭高地 | aspen-snowmass | ikon:7day | US | CO | colorado | 39.1750 | -106.8570 | 2451 | 3559 | r=2
+buttermilk | Buttermilk | 巴特米尔克 | aspen-snowmass | ikon:7day | US | CO | colorado | 39.2000 | -106.8650 | 2399 | 3018 | wiki=Buttermilk (ski area); r=2
+snowmass | Snowmass | 斯诺马斯 | aspen-snowmass | ikon:7day | US | CO | colorado | 39.1900 | -106.9500 | 2473 | 3813 | wiki=Snowmass (ski area)
+big-sky | Big Sky | 大天空 | | ikon:7day | US | MT | northern-rockies | 45.2800 | -111.4200 | 2072 | 3403 | wiki=Big Sky Resort; r=5
+brighton | Brighton | 布莱顿 | | ikon:7day | US | UT | utah | 40.5980 | -111.5830 | 2668 | 3200 | wiki=Brighton Ski Resort; r=2
+copper-mountain | Copper Mountain | 铜山 | | ikon:unlimited | US | CO | colorado | 39.4850 | -106.1600 | 2926 | 3753 | wiki=Copper Mountain (Colorado)
+deer-valley | Deer Valley | 鹿谷 | | ikon:7day | US | UT | utah | 40.6200 | -111.4900 | 2003 | 2917 |
+eldora | Eldora | 埃尔多拉 | | ikon:unlimited | US | CO | colorado | 39.9370 | -105.5830 | 2804 | 3231 | wiki=Eldora Mountain Resort
+snowbasin | Snowbasin | 雪盆地 | | ikon:7day | US | UT | utah | 41.2100 | -111.8600 | 1948 | 2850 |
+snowbird | Snowbird | 雪鸟 | | ikon:7day | US | UT | utah | 40.5700 | -111.6600 | 2365 | 3353 | wiki=Snowbird, Utah; r=2.5
+solitude | Solitude | 索利图德 | | ikon:unlimited | US | UT | utah | 40.6150 | -111.5950 | 2435 | 3200 | wiki=Solitude Mountain Resort; r=2
+steamboat | Steamboat | 斯廷博特 | | ikon:unlimited | US | CO | colorado | 40.4550 | -106.7700 | 2103 | 3221 | wiki=Steamboat Ski Resort
+taos | Taos Ski Valley | 陶斯 | | ikon:7day | US | NM | southwest | 36.5800 | -105.4400 | 2805 | 3804 |
+winter-park | Winter Park | 冬园 | | ikon:unlimited | US | CO | colorado | 39.8700 | -105.7700 | 2743 | 3676 | wiki=Winter Park Resort
+
+# ---------------------------------------------------------------- Ikon: US West
+alyeska | Alyeska | 阿利耶斯卡 | | ikon:7day | US | AK | alaska | 60.9600 | -149.0900 | 76 | 839 | wiki=Alyeska Resort; tz=America/Anchorage
+snow-summit | Snow Summit | 雪峰 (Snow Summit) | big-bear | ikon:unlimited | US | CA | socal | 34.2300 | -116.8900 | 2134 | 2499 | wiki=Snow Summit; r=2
+bear-mountain | Bear Mountain | 熊山 | big-bear | ikon:unlimited | US | CA | socal | 34.2250 | -116.8600 | 2170 | 2685 | wiki=Bear Mountain (ski area); r=2
+snow-valley | Snow Valley | 雪谷 | | ikon:unlimited | US | CA | socal | 34.2200 | -117.0350 | 2042 | 2390 | wiki=Snow Valley Mountain Resort; r=2
+crystal-mountain | Crystal Mountain | 水晶山 | | ikon:unlimited | US | WA | pnw | 46.9300 | -121.4850 | 1341 | 2134 | wiki=Crystal Mountain (Washington)
+june-mountain | June Mountain | 六月山 | | ikon:unlimited | US | CA | sierra-south | 37.7500 | -119.0700 | 2291 | 3075 | wiki=June Mountain ski area
+mt-bachelor | Mt. Bachelor | 巴切勒山 | | ikon:7day | US | OR | pnw | 43.9850 | -121.6850 | 1737 | 2763 | wiki=Mount Bachelor ski area; r=4
+schweitzer | Schweitzer | 施韦策 | | ikon:unlimited | US | ID | northern-rockies | 48.3750 | -116.6300 | 1219 | 1950 | wiki=Schweitzer Mountain; tz=America/Los_Angeles
+sierra-at-tahoe | Sierra-at-Tahoe | 太浩山脊 (Sierra-at-Tahoe) | | ikon:7day | US | CA | tahoe | 38.7950 | -120.0800 | 2024 | 2698 |
+sun-valley | Sun Valley | 太阳谷 | | ikon:7day | US | ID | northern-rockies | 43.6650 | -114.4000 | 1753 | 2789 | wiki=Sun Valley (resort); osm=Bald Mountain; tz=America/Boise
+summit-at-snoqualmie | The Summit at Snoqualmie | 斯诺夸尔米山口 | summit-at-snoqualmie | ikon:7day | US | WA | pnw | 47.4080 | -121.4130 | 795 | 1178 | r=2.2
+alpental | Alpental | 阿尔彭塔尔 | summit-at-snoqualmie | ikon:7day | US | WA | pnw | 47.4400 | -121.4300 | 963 | 1652 | r=1.5
+
+# ---------------------------------------------------------------- Ikon: US Midwest / East
+blue-mountain-pa | Blue Mountain Resort | 蓝山 (宾州) | | ikon:7day | US | PA | mid-atlantic | 40.8230 | -75.5130 | 140 | 488 | wiki=Blue Mountain Resort; r=2
+boyne-mountain | Boyne Mountain | 博因山 | | ikon:7day | US | MI | midwest | 45.1640 | -84.9310 | 220? | 341 | wiki=Boyne Mountain Resort; r=2
+camelback | Camelback | 骆驼背 | | ikon:7day | US | PA | mid-atlantic | 41.0510 | -75.3560 | 378 | 650 | wiki=Camelback Mountain Resort; r=2
+granite-peak | Granite Peak | 花岗岩峰 | | ikon:7day | US | WI | midwest | 44.9310 | -89.6820 | 379 | 592 | wiki=Granite Peak Ski Area; r=2
+pico | Pico Mountain | 皮科山 | killington-pico | ikon:7day | US | VT | northeast | 43.6620 | -72.8430 | 610 | 1209 | wiki=Pico Mountain; r=2
+loon | Loon Mountain | 潜鸟山 | | ikon:7day | US | NH | northeast | 44.0400 | -71.6300 | 290 | 930 | wiki=Loon Mountain Ski Resort
+lutsen | Lutsen Mountains | 卢森山 | | ikon:7day | US | MN | midwest | 47.6640 | -90.7200 | 263? | 514 |
+snowriver | Snowriver Mountain Resort | 雪河 | | ikon:7day | US | MI | midwest | 46.4900 | -89.9800 | 395? | 533? | tz=America/Menominee; r=4; wiki=Big Snow Resort
+snowshoe | Snowshoe | 雪鞋山 | | ikon:unlimited | US | WV | mid-atlantic | 38.4100 | -79.9950 | 1020 | 1482 | wiki=Snowshoe Mountain
+stratton | Stratton | 斯特拉顿 | | ikon:unlimited | US | VT | northeast | 43.1050 | -72.9150 | 571 | 1181 | wiki=Stratton Mountain Resort
+sugarbush | Sugarbush | 糖枫林 (Sugarbush) | | ikon:unlimited | US | VT | northeast | 44.1350 | -72.9050 | 452 | 1245 | wiki=Sugarbush Resort; r=5
+sugarloaf | Sugarloaf | 糖面包山 | | ikon:7day | US | ME | northeast | 45.0400 | -70.3100 | 432 | 1291 | wiki=Sugarloaf (ski resort)
+sunday-river | Sunday River | 周日河 | | ikon:7day | US | ME | northeast | 44.4700 | -70.8650 | 244 | 957 | wiki=Sunday River (ski resort); r=4
+the-highlands | The Highlands | 高地 (密歇根) | | ikon:7day | US | MI | midwest | 45.4680 | -84.9250 | 221? | 393 | wiki=The Highlands at Harbor Springs; r=2
+
+# ---------------------------------------------------------------- Ikon: Canada
+blue-mountain-on | Blue Mountain | 蓝山 (安大略) | | ikon:unlimited | CA | ON | canada-east | 44.5020 | -80.3100 | 230 | 450 | wiki=Blue Mountain (ski resort); tz=America/Toronto
+cypress-mountain | Cypress Mountain | 赛普拉斯山 | | ikon:7day | CA | BC | canada-west | 49.3960 | -123.2050 | 910 | 1440 | wiki=Cypress Mountain Ski Area; r=2.5
+le-massif | Le Massif de Charlevoix | 勒马西夫 | | ikon:7day | CA | QC | canada-east | 47.2800 | -70.5900 | 36 | 806 | wiki=Le Massif; tz=America/Toronto
+panorama | Panorama | 帕诺拉马 | | ikon:7day | CA | BC | canada-west | 50.4550 | -116.2450 | 1150 | 2450 | wiki=Panorama Mountain Resort; tz=America/Edmonton
+red-mountain | RED Mountain | 红山 | | ikon:7day | CA | BC | canada-west | 49.1020 | -117.8300 | 1185 | 2075 | wiki=Red Mountain Resort
+revelstoke | Revelstoke | 雷夫尔斯托克 | | ikon:7day | CA | BC | canada-west | 50.9550 | -118.1100 | 512 | 2225 | wiki=Revelstoke Mountain Resort
+silverstar | SilverStar | 银星 | | ikon:7day | CA | BC | canada-west | 50.3600 | -119.0600 | 1155 | 1915 | wiki=SilverStar Mountain Resort
+banff-sunshine | Banff Sunshine | 班夫阳光村 | skibig3 | ikon:7day | CA | AB | canada-west | 51.0800 | -115.7800 | 1660 | 2730 | wiki=Sunshine Village; tz=America/Edmonton; r=4
+lake-louise | Lake Louise | 路易斯湖 | skibig3 | ikon:7day | CA | AB | canada-west | 51.4400 | -116.1350 | 1646 | 2637 | wiki=Lake Louise Ski Resort; tz=America/Edmonton
+mt-norquay | Mt. Norquay | 诺奎山 | skibig3 | ikon:7day | CA | AB | canada-west | 51.2030 | -115.6050 | 1630 | 2133 | wiki=Mount Norquay ski resort; tz=America/Edmonton; r=2
+sun-peaks | Sun Peaks | 太阳峰 | | ikon:7day | CA | BC | canada-west | 50.8800 | -119.9000 | 1255 | 2082 | wiki=Sun Peaks Resort
+tremblant | Tremblant | 翠湖山 (Tremblant) | | ikon:unlimited | CA | QC | canada-east | 46.2150 | -74.5600 | 230 | 875 | wiki=Mont Tremblant Resort; tz=America/Toronto
+
+# ---------------------------------------------------------------- Ikon: Europe
+chamonix-brevent-flegere | Chamonix Brévent-Flégère | 霞慕尼 布雷旺-弗雷杰尔 | chamonix | ikon:7day | FR | | alps-fr | 45.9450 | 6.8550 | 1035 | 2525 | r=3; nowiki
+chamonix-grands-montets | Chamonix Les Grands Montets | 霞慕尼 大蒙特 | chamonix | ikon:7day | FR | | alps-fr | 45.9650 | 6.9500 | 1235 | 2765 | r=2.5; nowiki
+chamonix-balme | Chamonix Balme (Le Tour-Vallorcine) | 霞慕尼 巴尔姆 | chamonix | ikon:7day | FR | | alps-fr | 46.0100 | 6.9500 | 1260 | 2270 | r=2.5; nowiki
+chamonix-les-houches | Les Houches | 莱苏什 | chamonix | ikon:7day | FR | | alps-fr | 45.8800 | 6.7700 | 950 | 1900 | r=2.5; nowiki
+cortina | Cortina d'Ampezzo | 科尔蒂纳丹佩佐 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.5400 | 12.1000 | 1224 | 2930 | r=6; nowiki
+kronplatz | Kronplatz (Plan de Corones) | 克龙普拉茨 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.7400 | 11.9600 | 973 | 2275 | r=5; nowiki
+alta-badia | Alta Badia | 阿尔塔巴迪亚 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.5600 | 11.8900 | 1324 | 2778 | r=5; nowiki
+val-gardena | Val Gardena / Alpe di Siusi | 加尔代纳山谷 / 休西高原 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.5500 | 11.7000 | 1236 | 2518 | r=7; nowiki
+val-di-fassa | Val di Fassa / Carezza | 法萨山谷 / 卡雷扎 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.4600 | 11.7600 | 1320 | 2630? | r=6; nowiki
+arabba-marmolada | Arabba / Marmolada | 阿拉巴 / 马尔莫拉达 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.4800 | 11.8800 | 1446 | 3265 | r=5; nowiki
+tre-cime | 3 Zinnen Dolomites | 三峰山 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.6900 | 12.3700 | 1130 | 2200 | r=6; nowiki
+val-di-fiemme | Val di Fiemme / Obereggen | 菲耶梅山谷 / 奥伯埃根 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.3600 | 11.5300 | 1000? | 2388? | r=7; nowiki
+san-martino | San Martino di Castrozza / Passo Rolle | 圣马蒂诺 / 罗莱山口 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.2700 | 11.7900 | 1404 | 2357 | r=5; nowiki
+plose-gitschberg | Rio Pusteria / Bressanone (Plose) | 普洛瑟 / 吉奇贝格 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.6950 | 11.7300 | 1067 | 2505 | r=4; nowiki
+alpe-lusia-san-pellegrino | Alpe Lusia / San Pellegrino | 卢西亚高原 / 圣佩莱格里诺 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.3750 | 11.7900 | 1200? | 2513 | r=5; nowiki
+civetta | Civetta | 奇维塔 | dolomiti-superski | ikon:7day | IT | | dolomites | 46.3900 | 12.0500 | 1000 | 2100 | r=5; nowiki
+grandvalira | Grandvalira | 格兰瓦利拉 | grandvalira-resorts | ikon:7day | AD | | pyrenees | 42.5400 | 1.6800 | 1710 | 2640 | r=8
+pal-arinsal | Pal Arinsal | 帕尔-阿林萨尔 | grandvalira-resorts | ikon:7day | AD | | pyrenees | 42.5600 | 1.4900 | 1550 | 2560 | r=4; wiki=Vallnord
+ordino-arcalis | Ordino Arcalís | 奥尔迪诺-阿卡利斯 | grandvalira-resorts | ikon:7day | AD | | pyrenees | 42.6300 | 1.4900 | 1940 | 2625 | r=3; nowiki
+ischgl | Ischgl | 伊施格尔 | ischgl-paznaun | ikon:7day | AT | | alps-at | 46.9800 | 10.3000 | 1377 | 2872 | r=6; nowiki
+kappl | Kappl | 卡普尔 | ischgl-paznaun | ikon:7day | AT | | alps-at | 47.0700 | 10.3700 | 1180 | 2690 | r=3; nowiki
+see | See | 泽 (See) | ischgl-paznaun | ikon:7day | AT | | alps-at | 47.0750 | 10.4600 | 1050 | 2456 | r=3; nowiki
+galtuer | Galtür | 加尔蒂尔 | ischgl-paznaun | ikon:7day | AT | | alps-at | 46.9600 | 10.1700 | 1635 | 2297 | r=3; nowiki
+kitzbuehel | Kitzbühel | 基茨比厄尔 | | ikon:7day | AT | | alps-at | 47.4200 | 12.3700 | 800 | 2000 | r=8; nowiki
+megeve | Megève | 梅杰夫 | | ikon:7day | FR | | alps-fr | 45.8500 | 6.6200 | 1113 | 2353 | r=6; nowiki
+st-moritz-corviglia | St. Moritz Corviglia | 圣莫里茨 科尔维利亚 | st-moritz | ikon:7day | CH | | alps-ch | 46.5100 | 9.8100 | 1720 | 3057 | r=4; nowiki
+corvatsch | Corvatsch | 科尔瓦奇 | st-moritz | ikon:7day | CH | | alps-ch | 46.4300 | 9.8200 | 1797 | 3303 | r=4; nowiki
+diavolezza-lagalb | Diavolezza / Lagalb | 迪亚沃勒扎 | st-moritz | ikon:7day | CH | | alps-ch | 46.4150 | 9.9750 | 2093 | 2978 | r=3; nowiki
+courmayeur | Courmayeur | 库马约尔 | valle-daosta | ikon:7day | IT | | alps-it | 45.7900 | 6.9400 | 1224 | 2624 | r=3.5; nowiki
+cervinia | Breuil-Cervinia Valtournenche | 切尔维尼亚 | valle-daosta | ikon:7day | IT | | alps-it | 45.9200 | 7.6500 | 1524 | 3480 | r=6; nowiki
+la-thuile | La Thuile | 拉蒂勒 | valle-daosta | ikon:7day | IT | | alps-it | 45.7000 | 6.9300 | 1441 | 2641 | r=4; nowiki
+pila | Pila | 皮拉 | valle-daosta | ikon:7day | IT | | alps-it | 45.6800 | 7.3100 | 1765 | 2709 | r=3; nowiki
+monterosa-ski | Monterosa Ski | 蒙特罗萨 | valle-daosta | ikon:7day | IT | | alps-it | 45.8500 | 7.8000 | 1212 | 2971 | r=8; nowiki
+zermatt | Zermatt | 采尔马特 | | ikon:7day | CH | | alps-ch | 45.9850 | 7.7400 | 1620 | 3883 | r=6; nowiki
+
+# ---------------------------------------------------------------- Ikon: Oceania / Asia / South America
+coronet-peak | Coronet Peak | 皇冠峰 | nzski | ikon:7day | NZ | | new-zealand | -44.9270 | 168.7370 | 1187 | 1649 | r=2.5
+the-remarkables | The Remarkables | 卓越山 | nzski | ikon:7day | NZ | | new-zealand | -45.0540 | 168.8140 | 1610 | 1943 | r=2.5; wiki=The Remarkables Ski Area
+mt-hutt | Mt Hutt | 哈特山 | nzski | ikon:7day | NZ | | new-zealand | -43.4870 | 171.5350 | 1438 | 2086 | r=2.5; wiki=Mount Hutt
+mt-buller | Mt Buller | 布勒山 | | ikon:7day | AU | VIC | australia | -37.1460 | 146.4400 | 1375 | 1790 | wiki=Mount Buller, Victoria
+thredbo | Thredbo | 斯雷德博 | | ikon:7day | AU | NSW | australia | -36.5000 | 148.2900 | 1365 | 2037 | wiki=Thredbo, New South Wales
+appi | APPI Kogen | 安比高原 | | ikon:7day | JP | Iwate | japan | 40.0000 | 140.9600 | 600? | 1304 | nowiki
+arai | Lotte Arai | 新井 | | ikon:7day | JP | Niigata | japan | 36.9900 | 138.1800 | 329 | 1280 | nowiki
+beidahu | Beidahu | 北大湖 | | ikon:7day | CN | Jilin | east-asia | 43.4200 | 126.6200 | 537 | 1359 | r=5; nowiki
+furano | Furano | 富良野 | | ikon:7day | JP | Hokkaido | japan | 43.3300 | 142.3400 | 245 | 1209 | nowiki
+lake-songhua | Lake Songhua | 松花湖 | | ikon:7day | CN | Jilin | east-asia | 43.7000 | 126.6500 | 330? | 935 | r=6; nowiki
+madarao | Madarao Kogen | 斑尾高原 | | ikon:7day | JP | Nagano | japan | 36.8600 | 138.2900 | 910 | 1350 | r=2.5; nowiki
+yongpyong | Mona Yongpyong | 龙平 | | ikon:7day | KR | Gangwon | east-asia | 37.6450 | 128.6800 | 700 | 1438 | wiki=Yongpyong Resort
+mt-t | Mt.T (Tanigawadake Tenjindaira) | 谷川岳天神平 | | ikon:7day | JP | Gunma | japan | 36.8250 | 138.9550 | 750 | 1500 | r=2.5; nowiki
+myoko-suginohara | Myoko Suginohara | 妙高杉之原 | | ikon:7day | JP | Niigata | japan | 36.8600 | 138.1200 | 731 | 1855 | r=2.5; nowiki
+nekoma | Nekoma Mountain | 猫魔 | | ikon:7day | JP | Fukushima | japan | 37.6400 | 140.0500 | 700 | 1338 | r=4; nowiki
+hanazono | Niseko Hanazono | 二世谷花园 | niseko-united | ikon:7day | JP | Hokkaido | japan | 42.8800 | 140.7100 | 308 | 1040? | r=1.5; nowiki
+niseko-village | Niseko Village | 二世谷村 | niseko-united | ikon:7day | JP | Hokkaido | japan | 42.8450 | 140.6750 | 280 | 1170 | r=1.5; nowiki
+annupuri | Niseko Annupuri | 二世谷安努普利 | niseko-united | ikon:7day | JP | Hokkaido | japan | 42.8500 | 140.6450 | 400 | 1156 | r=1.5; nowiki
+shiga-kogen | Shiga Kogen | 志贺高原 | | ikon:7day | JP | Nagano | japan | 36.7400 | 138.5100 | 1340 | 2307 | r=8; nowiki
+yunding | Yunding Snow Park (Genting) | 云顶滑雪公园 | | ikon:7day | CN | Hebei | east-asia | 40.9600 | 115.4200 | 1700? | 2101 | r=4; nowiki
+zao | Zao Onsen | 藏王温泉 | | ikon:7day | JP | Yamagata | japan | 38.1650 | 140.4100 | 780 | 1661 | r=3.5; nowiki
+valle-nevado | Valle Nevado | 瓦勒内瓦多 | | ikon:7day | CL | | south-america | -33.3550 | -70.2500 | 2860 | 3670 | tz=America/Santiago
+
+# ---------------------------------------------------------------- Ikon: bonus mountains (2 days each)
+cranmore | Cranmore | 克兰莫尔 | | ikon:2day | US | NH | northeast | 44.0560 | -71.1100 | 244? | 610? | wiki=Cranmore Mountain Resort; r=2
+ski-butternut | Ski Butternut | 巴特纳特 | | ikon:2day | US | MA | northeast | 42.1800 | -73.3200 | 305 | 549 | r=2
+jiminy-peak | Jiminy Peak | 吉米尼峰 | | ikon:2day | US | MA | northeast | 42.5550 | -73.2900 | 375 | 725 | r=2
+caberfae | Caberfae Peaks | 卡伯菲峰 | | ikon:2day | US | MI | midwest | 44.2500 | -85.7200 | 330? | 478? | r=2
+crystal-ridge | Crystal Ridge | 水晶岭 | | ikon:2day | US | WI | midwest | 42.9000 | -88.0300 | 230? | 290? | r=2; nowiki
+devils-head | Devil's Head | 魔鬼头 | | ikon:2day | US | WI | midwest | 43.4200 | -89.6300 | 300? | 455? | r=2; wiki=Devil's Head Resort
+little-switzerland | Little Switzerland | 小瑞士 | | ikon:2day | US | WI | midwest | 43.3300 | -88.2800 | 300? | 365? | r=2; nowiki
+nordic-mountain | Nordic Mountain | 诺迪克山 | | ikon:2day | US | WI | midwest | 44.1500 | -89.1600 | 300? | 380? | r=4; nowiki
+wild-mountain | Wild Mountain | 怀尔德山 | | ikon:2day | US | MN | midwest | 45.4900 | -92.6900 | 240? | 335? | r=2; nowiki
+buck-hill | Buck Hill | 巴克山 | | ikon:2day | US | MN | midwest | 44.7240 | -93.2850 | 280? | 370? | r=2
+giants-ridge | Giants Ridge | 巨人岭 | | ikon:2day | US | MN | midwest | 47.5750 | -92.3000 | 430? | 580? | r=2.5
+snowy-range | Snowy Range | 雪岭 | | ikon:2day | US | WY | northern-rockies | 41.3450 | -106.1800 | 2734 | 3048 | r=2; wiki=Snowy Range Ski Area
+tamarack | Tamarack | 塔玛拉克 | | ikon:2day | US | ID | northern-rockies | 44.6800 | -116.1300 | 1493 | 2347 | wiki=Tamarack Resort; tz=America/Boise
+grouse-mountain | Grouse Mountain | 松鸡山 |  | ikon:2day | CA | BC | canada-west | 49.3800 | -123.0800 | 874 | 1231 | r=2
+
+# ---------------------------------------------------------------- Epic: unlimited
+beaver-creek | Beaver Creek | 比弗克里克 | | epic:unlimited | US | CO | colorado | 39.5850 | -106.5150 | 2255 | 3488 | wiki=Beaver Creek Resort
+breckenridge | Breckenridge | 布雷肯里奇 | | epic:unlimited | US | CO | colorado | 39.4750 | -106.0800 | 2926 | 3962 | wiki=Breckenridge Ski Resort; r=5
+keystone | Keystone | 基斯通 | | epic:unlimited | US | CO | colorado | 39.5700 | -105.9300 | 2829 | 3782 | wiki=Keystone Resort; r=5
+crested-butte | Crested Butte | 克雷斯特德比特 | | epic:unlimited | US | CO | colorado | 38.8900 | -106.9550 | 2858 | 3707 | wiki=Crested Butte Mountain Resort
+park-city | Park City | 帕克城 | | epic:unlimited | US | UT | utah | 40.6300 | -111.5400 | 2080 | 3049 | wiki=Park City Mountain Resort; r=7
+heavenly | Heavenly | 天堂山 | | epic:unlimited | US | CA | tahoe | 38.9200 | -119.9100 | 1996 | 3060 | wiki=Heavenly Mountain Resort; r=5
+northstar | Northstar | 北极星 | | epic:unlimited | US | CA | tahoe | 39.2550 | -120.1300 | 1929 | 2624 | wiki=Northstar California
+stowe | Stowe | 斯托 | | epic:unlimited | US | VT | northeast | 44.5300 | -72.7850 | 475 | 1134 | wiki=Stowe Mountain Resort
+okemo | Okemo | 奥克莫 | | epic:unlimited | US | VT | northeast | 43.4000 | -72.7300 | 349 | 1019 | wiki=Okemo Mountain
+mount-snow | Mount Snow | 雪山 (Mount Snow) | | epic:unlimited | US | VT | northeast | 42.9600 | -72.9200 | 579 | 1097 |
+mount-sunapee | Mount Sunapee | 苏纳皮山 | | epic:unlimited | US | NH | northeast | 43.3200 | -72.0800 | 375 | 835 | wiki=Mount Sunapee Resort
+attitash | Attitash | 阿提塔什 | | epic:unlimited | US | NH | northeast | 44.0800 | -71.2400 | 183 | 716 | wiki=Attitash Mountain Resort
+wildcat | Wildcat Mountain | 野猫山 | | epic:unlimited | US | NH | northeast | 44.2600 | -71.2200 | 594 | 1236 | wiki=Wildcat Mountain Ski Area; r=2.5
+crotched | Crotched Mountain | 克罗切德山 | | epic:unlimited | US | NH | northeast | 43.0000 | -71.8700 | 320 | 625 | wiki=Crotched Mountain; r=2
+hunter | Hunter Mountain | 亨特山 | | epic:unlimited | US | NY | northeast | 42.1900 | -74.2300 | 488 | 975 | wiki=Hunter Mountain (ski area)
+liberty | Liberty Mountain | 自由山 | | epic:unlimited | US | PA | mid-atlantic | 39.7630 | -77.3750 | 174 | 363 | wiki=Liberty Mountain Resort; r=2
+roundtop | Roundtop Mountain | 圆顶山 | | epic:unlimited | US | PA | mid-atlantic | 40.1100 | -76.9300 | 225? | 408 | wiki=Roundtop Mountain Resort; r=2
+whitetail | Whitetail | 白尾 | | epic:unlimited | US | PA | mid-atlantic | 39.7420 | -77.9330 | 263 | 549 | wiki=Whitetail Ski Resort; r=2
+jack-frost | Jack Frost | 杰克弗罗斯特 | | epic:unlimited | US | PA | mid-atlantic | 41.1100 | -75.6500 | 427 | 610 | r=2; nowiki
+big-boulder | Big Boulder | 大圆石 | | epic:unlimited | US | PA | mid-atlantic | 41.0500 | -75.6000 | 518 | 655 | r=2; nowiki
+seven-springs | Seven Springs | 七泉 | | epic:unlimited | US | PA | mid-atlantic | 40.0200 | -79.3000 | 683 | 912 | wiki=Seven Springs Mountain Resort; r=2.5
+laurel-mountain | Laurel Mountain | 月桂山 | | epic:unlimited | US | PA | mid-atlantic | 40.1600 | -79.1650 | 610 | 853 | wiki=Laurel Mountain Ski Resort; r=2
+hidden-valley-pa | Hidden Valley (PA) | 隐谷 (宾州) | | epic:unlimited | US | PA | mid-atlantic | 40.0550 | -79.2600 | 716? | 869? | r=2; nowiki
+afton-alps | Afton Alps | 阿夫顿阿尔卑斯 | | epic:unlimited | US | MN | midwest | 44.8550 | -92.7900 | 213? | 320? | r=2
+mt-brighton | Mt. Brighton | 布莱顿山 (密歇根) | | epic:unlimited | US | MI | midwest | 42.5400 | -83.8100 | 280? | 350? | r=2; wiki=Mount Brighton
+wilmot | Wilmot Mountain | 威尔莫特 | | epic:unlimited | US | WI | midwest | 42.5000 | -88.1900 | 230? | 290? | r=2
+alpine-valley-oh | Alpine Valley (OH) | 阿尔派谷 (俄亥俄) | | epic:unlimited | US | OH | midwest | 41.5300 | -81.2600 | 330? | 400? | r=2; nowiki
+boston-mills | Boston Mills | 波士顿磨坊 | boston-mills-brandywine | epic:unlimited | US | OH | midwest | 41.2650 | -81.5600 | 220? | 290? | r=1.5; nowiki
+brandywine | Brandywine | 布兰迪万 | boston-mills-brandywine | epic:unlimited | US | OH | midwest | 41.2750 | -81.5400 | 230? | 300? | r=1.5; nowiki
+mad-river-mountain | Mad River Mountain | 疯河山 | | epic:unlimited | US | OH | midwest | 40.3200 | -83.6800 | 370? | 460? | r=2
+hidden-valley-mo | Hidden Valley (MO) | 隐谷 (密苏里) | | epic:unlimited | US | MO | midwest | 38.5300 | -90.6500 | 180? | 280? | r=2; nowiki
+snow-creek | Snow Creek | 雪溪 | | epic:unlimited | US | MO | midwest | 39.4700 | -94.9700 | 240? | 330? | r=2; nowiki
+paoli-peaks | Paoli Peaks | 保利峰 | | epic:unlimited | US | IN | midwest | 38.5600 | -86.5100 | 180? | 275? | r=2; tz=America/Indiana/Indianapolis
+andermatt | Andermatt (Gemsstock) | 安德马特 | andermatt-sedrun-disentis | epic:unlimited | CH | | alps-ch | 46.6100 | 8.6000 | 1444 | 2961 | r=3; nowiki
+sedrun | Sedrun / Oberalp | 塞德龙 / 上阿尔卑 | andermatt-sedrun-disentis | epic:unlimited | CH | | alps-ch | 46.6650 | 8.7100 | 1444 | 2600 | r=5; nowiki
+disentis | Disentis | 迪森蒂斯 | andermatt-sedrun-disentis | epic:unlimited | CH | | alps-ch | 46.7200 | 8.8400 | 1227 | 2833 | r=3.5; nowiki
+crans-montana | Crans-Montana | 克莱恩-蒙塔纳 | | epic:unlimited | CH | | alps-ch | 46.3400 | 7.5000 | 1500 | 2927 | r=5; nowiki
+perisher | Perisher | 佩里舍 | | epic:unlimited | AU | NSW | australia | -36.4050 | 148.4100 | 1605 | 2054 | wiki=Perisher Ski Resort; r=5
+falls-creek | Falls Creek | 福尔斯溪 | | epic:unlimited | AU | VIC | australia | -36.8650 | 147.2800 | 1500 | 1780 | wiki=Falls Creek, Victoria
+hotham | Mt Hotham | 霍瑟姆山 | | epic:unlimited | AU | VIC | australia | -36.9850 | 147.1450 | 1450 | 1845 | wiki=Mount Hotham
+
+# ---------------------------------------------------------------- Epic: partners
+telluride | Telluride | 特柳赖德 | | epic:7day | US | CO | colorado | 37.9150 | -107.8300 | 2659 | 3831 | wiki=Telluride Ski Resort
+fernie | Fernie | 弗尼 | | epic:7day | CA | BC | canada-west | 49.4600 | -115.1000 | 1052 | 2134 | wiki=Fernie Alpine Resort; tz=America/Edmonton
+kicking-horse | Kicking Horse | 踢马山 | | epic:7day | CA | BC | canada-west | 51.2850 | -117.0700 | 1190 | 2450 | wiki=Kicking Horse Resort; tz=America/Edmonton
+kimberley | Kimberley | 金伯利 | | epic:7day | CA | BC | canada-west | 49.6850 | -116.0250 | 1230 | 1982 | wiki=Kimberley Alpine Resort; tz=America/Edmonton
+nakiska | Nakiska | 纳基斯卡 | | epic:7day | CA | AB | canada-west | 50.9400 | -115.1650 | 1479 | 2258 | tz=America/Edmonton
+mont-sainte-anne | Mont-Sainte-Anne | 圣安妮山 | | epic:7day | CA | QC | canada-east | 47.0800 | -70.9100 | 175 | 800 | tz=America/Toronto
+stoneham | Stoneham | 斯通厄姆 | | epic:7day | CA | QC | canada-east | 47.0300 | -71.3900 | 212 | 632 | wiki=Stoneham Mountain Resort; tz=America/Toronto
+happo-one | Hakuba Happo-One | 白马八方尾根 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.7000 | 137.8150 | 760 | 1831 | r=2; nowiki
+hakuba-goryu | Hakuba Goryu | 白马五龙 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.6600 | 137.8250 | 750 | 1676 | r=1.3; nowiki
+hakuba47 | Hakuba47 | 白马47 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.6770 | 137.8150 | 820 | 1614 | r=1.2; nowiki
+hakuba-iwatake | Hakuba Iwatake | 白马岩岳 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.7200 | 137.8500 | 750 | 1289 | r=1.8; nowiki
+tsugaike | Tsugaike Kogen | 栂池高原 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.7700 | 137.8700 | 800 | 1704 | r=2.2; nowiki
+hakuba-norikura | Hakuba Norikura | 白马乘鞍 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.7920 | 137.8850 | 750 | 1300 | r=1.2; nowiki
+hakuba-cortina | Hakuba Cortina | 白马 Cortina | hakuba-valley | epic:5day | JP | Nagano | japan | 36.8070 | 137.8950 | 872 | 1402 | r=1.2; nowiki
+hakuba-sanosaka | Hakuba Sanosaka | 白马佐野坂 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.6150 | 137.8450 | 780? | 1200? | r=1.5; nowiki
+kashimayari | Kashimayari | 鹿岛枪 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.5850 | 137.8250 | 830 | 1550 | r=2; nowiki
+jiigatake | Jiigatake | 爷岳 | hakuba-valley | epic:5day | JP | Nagano | japan | 36.5600 | 137.8300 | 940? | 1200? | r=1.5; nowiki
+rusutsu | Rusutsu | 留寿都 | | epic:5day | JP | Hokkaido | japan | 42.7400 | 140.9000 | 400 | 994 | wiki=Rusutsu Resort; r=4
+madonna-di-campiglio | Madonna di Campiglio | 麦当娜迪坎皮利奥 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.2300 | 10.8300 | 1550 | 2504 | r=4; nowiki
+pinzolo | Pinzolo | 平佐洛 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.1750 | 10.7900 | 800 | 2100 | r=3; nowiki
+folgarida-marilleva | Folgarida-Marilleva | 福尔加里达-马里莱瓦 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.2950 | 10.8500 | 900 | 2180 | r=3.5; nowiki
+pejo | Pejo | 佩约 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.3650 | 10.6600 | 1400 | 3000 | r=3; nowiki
+ponte-di-legno-tonale | Ponte di Legno-Tonale | 蓬泰迪莱尼奥-托纳莱 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.2600 | 10.5800 | 1121 | 3016 | r=6; nowiki
+paganella | Andalo-Fai della Paganella | 帕加内拉 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.1600 | 11.0300 | 1040 | 2125 | r=3; nowiki
+monte-bondone | Monte Bondone | 邦多内山 | skirama-dolomiti | epic:7day | IT | | dolomites | 46.0300 | 11.0500 | 1185 | 2090 | r=3; nowiki
+alpe-cimbra | Alpe Cimbra (Folgaria-Lavarone) | 钦布拉高原 | skirama-dolomiti | epic:7day | IT | | dolomites | 45.9200 | 11.2000 | 1200 | 1850 | r=5; nowiki
+courchevel | Courchevel | 高雪维尔 | les-3-vallees | epic:7day | FR | | alps-fr | 45.4100 | 6.6350 | 1300 | 2738 | r=4; nowiki
+meribel | Méribel | 梅里贝尔 | les-3-vallees | epic:7day | FR | | alps-fr | 45.3850 | 6.5700 | 1400 | 2952 | r=3; nowiki
+les-menuires | Les Menuires | 莱梅尼雷 | les-3-vallees | epic:7day | FR | | alps-fr | 45.3250 | 6.5350 | 1815 | 2850 | r=3; nowiki
+saint-martin-de-belleville | Saint-Martin-de-Belleville | 圣马丁德贝尔维尔 | les-3-vallees | epic:7day | FR | | alps-fr | 45.3800 | 6.5100 | 1450 | 2434 | r=2; nowiki
+val-thorens | Val Thorens | 葱仁谷 | les-3-vallees | epic:7day | FR | | alps-fr | 45.2950 | 6.5800 | 2300 | 3230 | r=3; nowiki
+orelle | Orelle | 奥雷勒 | les-3-vallees | epic:7day | FR | | alps-fr | 45.2550 | 6.5700 | 2350? | 3230 | r=2; nowiki
+verbier | Verbier | 韦尔比耶 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.0900 | 7.2600 | 1500 | 3330 | r=4; nowiki
+la-tzoumaz | La Tzoumaz | 拉措马 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.1350 | 7.2400 | 1500 | 2354 | r=2; nowiki
+nendaz | Nendaz | 南达 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.1500 | 7.3000 | 1400 | 3330? | r=3.5; nowiki
+veysonnaz | Veysonnaz | 韦松纳 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.1850 | 7.3400 | 1400 | 2450? | r=2; nowiki
+thyon | Thyon | 蒂永 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.1700 | 7.3750 | 1800 | 2450? | r=2; nowiki
+bruson | Bruson | 布吕松 | verbier-4-vallees | epic:5day | CH | | alps-ch | 46.0500 | 7.2100 | 1080 | 2200 | r=2.5; nowiki
+st-anton | St. Anton am Arlberg | 圣安东 | ski-arlberg | epic:3day | AT | | alps-at | 47.1400 | 10.2300 | 1304 | 2811 | r=5; nowiki
+stuben | Stuben | 施图本 | ski-arlberg | epic:3day | AT | | alps-at | 47.1350 | 10.1550 | 1407 | 2400 | r=2; nowiki
+lech | Lech | 莱希 | ski-arlberg | epic:3day | AT | | alps-at | 47.2150 | 10.1300 | 1450 | 2377 | r=3.5; nowiki
+zuers | Zürs | 楚尔斯 | ski-arlberg | epic:3day | AT | | alps-at | 47.1700 | 10.1650 | 1717 | 2450 | r=2.5; nowiki
+warth-schroecken | Warth-Schröcken | 瓦尔特-施勒肯 | ski-arlberg | epic:3day | AT | | alps-at | 47.2550 | 10.1700 | 1270 | 2050 | r=3; nowiki
+saalbach-hinterglemm | Saalbach Hinterglemm | 萨尔巴赫-欣特格莱姆 | saalbach-zell-kaprun | epic:5day | AT | | alps-at | 47.3900 | 12.6200 | 1003 | 2096 | r=6; nowiki
+leogang | Leogang | 莱奥冈 | saalbach-zell-kaprun | epic:5day | AT | | alps-at | 47.4250 | 12.7300 | 840 | 1914 | r=2.5; nowiki
+fieberbrunn | Fieberbrunn | 菲伯布伦 | saalbach-zell-kaprun | epic:5day | AT | | alps-at | 47.4450 | 12.5800 | 830 | 2020 | r=3; nowiki
+schmittenhoehe | Schmittenhöhe (Zell am See) | 施米滕霍赫 | saalbach-zell-kaprun | epic:5day | AT | | alps-at | 47.3300 | 12.7400 | 757 | 2000 | r=3.5; nowiki
+kitzsteinhorn | Kitzsteinhorn (Kaprun) | 基茨施泰因霍恩 | saalbach-zell-kaprun | epic:5day | AT |  | alps-at | 47.2100 | 12.6900 | 1976 | 3029 | r=5; nowiki
+hochzillertal | Hochzillertal-Hochfügen | 高齐勒塔尔 | zillertal | epic:5day | AT | | alps-at | 47.2700 | 11.8300 | 560 | 2500 | r=5; nowiki
+spieljoch | Spieljoch (Fügen) | 施皮尔约赫 | zillertal | epic:5day | AT | | alps-at | 47.3300 | 11.8200 | 650 | 2054 | r=2.5; nowiki
+zillertal-arena | Zillertal Arena | 齐勒塔尔竞技场 | zillertal | epic:5day | AT | | alps-at | 47.2300 | 11.9600 | 580 | 2500 | r=8; nowiki
+mayrhofen | Mayrhofen (Penken-Ahorn) | 迈尔霍芬 | zillertal | epic:5day | AT | | alps-at | 47.1800 | 11.8300 | 630 | 2500 | r=5; nowiki
+hintertux | Hintertux Glacier | 辛特图克斯冰川 | zillertal | epic:5day | AT | | alps-at | 47.0750 | 11.6700 | 1500 | 3250 | r=4; nowiki
+silvretta-montafon | Silvretta Montafon | 锡尔夫雷塔-蒙塔丰 | | epic:5day | AT | | alps-at | 47.0500 | 9.9500 | 700 | 2430 | r=7; nowiki
+soelden | Sölden | 索尔登 | | epic:5day | AT | | alps-at | 46.9500 | 10.9500 | 1350 | 3340 | r=6; nowiki

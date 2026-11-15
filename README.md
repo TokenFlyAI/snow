@@ -2,11 +2,13 @@
 
 多模型融合的滑雪场降雪预报，页面在 **https://tokenfly.ai/snow/**（PWA，可安装到手机）。
 
-- 每 6 小时由 GitHub Actions 自动抓取 10 个数值模式、计算、发布，无需人工操作。
-- 不依赖单一模型：把各模型订正到雪场的山脚 / 山腰 / 山顶后融合，同时给出各模型的范围和信心。
+- Ikon / Epic 2026-27 全部雪场，229 个预报点（多山头目的地拆开，例如 Aspen Snowmass 4 个、白马 10 个、多洛米蒂 12 个）。
+- 不依赖单一模型：前 10 天把最多 8 个确定性模型订正到雪场的山脚 / 山腰 / 山顶后融合；范围和信心来自 4 个集合预报共 143 个成员。
+- 越远越不给假精度：第 11–16 天只给概率（≥2.5 cm、≥15 cm），第 3–5 周只给周累计的概率。
+- 由 GitHub Actions 每 6 小时自动运行：重点雪场每次全量更新，其余每天一次，总量控制在免费额度内。
 - 数据全部来自免费开放的来源（见[数据来源](#数据来源与署名)）。
 
-当前是**第一阶段（MVP）**：10 个雪场、逐小时 7 天、逐日 16 天、多模型对比、本地收藏。后续阶段见[路线图](#路线图)。
+当前是**第二阶段**：集合预报 + 概率、全部雪场、分档更新、地图和排行榜。第二阶段的设计与交接说明在 [`docs/phase2-handoff.md`](docs/phase2-handoff.md)。后续阶段见[路线图](#路线图)。
 
 ## 架构
 
@@ -14,9 +16,10 @@
 TokenFlyAI/snow（本仓库，公开）                       ccyjava/tokenfly（主站，私有）
 ┌──────────────────────────────────────────┐        ┌─────────────────────────────┐
 │ data/resorts.yaml      雪场库            │        │ aiverse/snow/  静态外壳     │
-│ pipeline/              Python 数据管道   │        │ snow_site.py   /snow 路由   │
-│   ingest/   Open-Meteo 多模型抓取        │        └──────────────┬──────────────┘
-│   process/  订正·雪线·雪水比·融合·聚合   │   scripts/deploy_shell.sh（仅代码变动时）
+│ data/featured.yaml     重点雪场          │        │ snow_site.py   /snow 路由   │
+│ pipeline/              Python 数据管道   │        └──────────────┬──────────────┘
+│   ingest/   确定性模型 + 集合预报抓取    │                       │
+│   process/  订正·雪线·雪水比·融合·集合   │   scripts/deploy_shell.sh（仅代码变动时）
 │   publish/  生成静态 JSON                │                       │
 │ web/                   Next.js 静态导出  │───────────────────────┘
 │ .github/workflows/                       │
@@ -27,15 +30,32 @@ TokenFlyAI/snow（本仓库，公开）                       ccyjava/tokenfly�
                               浏览器  https://tokenfly.ai/snow/ ───┘
 ```
 
-为什么分成两处：tokenfly.ai 是 Render 上的 Python 服务，推送主站仓库会重启整个主站。预报数据每 6 小时变一次，所以**数据**走本仓库的 GitHub Pages（Actions 以 artifact 发布，不进 git 历史），主站仓库里只放**不含数据的页面外壳**，只有改了前端代码才需要重新部署。以后迁移到 Cloudflare R2 只需改 `NEXT_PUBLIC_DATA_BASE`。
+为什么分成两处：tokenfly.ai 是 Render 上的 Python 服务，推送主站仓库会重启整个主站。预报数据每 6 小时变一次，所以**数据**走本仓库的 GitHub Pages（Actions 以 artifact 发布，不进 git 历史），主站仓库里只放**不含数据的页面外壳**，只有改了前端代码或雪场名单才需要重新部署。以后迁移到 Cloudflare R2 只需改 `NEXT_PUBLIC_DATA_BASE`。
+
+### 分档更新与 API 额度
+
+Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 1 次；集合预报每个成员都算一个变量），我们给自己定的上限是 8,000。
+
+| 档 | 雪场 | 确定性模型 | 集合预报 | 每点每天约 |
+|---|---|---|---|---|
+| featured | `data/featured.yaml`（28 个） | 每 6 小时，所有覆盖它的模型（最多 8 个） | 每天一次：ECMWF ENS、GEFS、GEPS、ICON-EPS | 115 次 |
+| standard | 其余 201 个 | 每天一次：ECMWF IFS + GFS + 一个区域模型 | 每天一次：GEFS | 16 次 |
+
+- 每天一次的刷新落在当地早晨之前：欧洲 02:37 UTC，北美东部和南美 08:37，北美西部 14:37，亚洲和大洋洲 20:37。
+- 每次运行先读上一版已发布的数据（`--previous`，默认是线上 GitHub Pages），不到期的雪场原样带过，所以每次发布的都是完整的一套。集合成员的日总量缓存在 `ens/{id}.json`。
+- 按计划估算每天约 6,500 次；`tests/test_budget.py` 在估算超过 8,000 时失败。每次运行的实际用量记在 `manifest.json` 的 `api_usage`，限速器保证每分钟 ≤ 480、每小时 ≤ 4,800。
+- 一次全量运行（`--mode full`，或线上数据丢失后的第一次运行）约 4,500 次。
 
 ### 发布的数据（`data/v1/`）
 
 | 文件 | 内容 |
 |---|---|
-| `manifest.json` | 运行时间、各模型是否可用、API 用量、来源署名。最后写入，存在即表示本次运行完整 |
-| `resorts.json` | 所有雪场的元数据 + 24h / 72h / 7 天 / 16 天降雪汇总（首页、列表、排行用） |
-| `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）、逐日 16 天（夜间 / 白天降雪、范围、信心、雪质）、各模型逐日降雪 |
+| `manifest.json` | 运行时间、本次刷新了哪些雪场、各模型和集合是否可用、API 用量（本次 + 每日估算）、来源署名。最后写入，存在即表示本次运行完整 |
+| `resorts.json` | 所有雪场的元数据、分档 + 24h / 72h / 7 天降雪、3 / 7 / 16 天滑雪日累计和集合范围、第 3–5 周展望（首页、地图、排行用） |
+| `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）；逐日：前 10 天点值（夜间 / 白天降雪、集合 10–90% 范围、信心、雪质），第 11–16 天只有集合分位数和概率；第 3–5 周展望；各模型逐日降雪 |
+| `ens/{id}.json` | 集合各成员的滑雪日降雪（未订正的原始值），供下一次运行复用，前端不读 |
+
+数据格式版本是 `schema_version: 2`（字段说明见 `docs/phase2-handoff.md` §2.6 和 `web/lib/types.ts`）。
 
 统一用公制（cm、mm、°C、m、km/h），单位换算在前端做。
 
@@ -48,8 +68,12 @@ TokenFlyAI/snow（本仓库，公开）                       ccyjava/tokenfly�
 | 降水类型 | 雪线以上全是雪，往下 300m 线性过渡到雨；每个海拔分别判断，所以同一场降水可能山顶下雪、山脚下雨 | `process/snowlevel.py` |
 | 雪水比 | Kuchera 法（气柱最高温度），上限 25:1；风大时最多再降 35%（风压实） | `process/slr.py` |
 | 没有气压层的模型 | 例如 NBM：降水量和 2m 气温用它自己的，雪线和递减率借用其他模型的中位数 | `process/derive.py` |
-| 融合 | 按预报时效的经验权重：0–48h 高分辨率模型（HRRR、RRFS、HRDPS、NBM）权重大，3–10 天以 ECMWF / NBM / GFS 为主；缺数据的模型自动剔除并重新归一 | `process/blend.py`、`config.py` |
-| 范围与信心 | 各模型日降雪量的加权 10% / 90% 分位；信心来自模型分歧，并随时效封顶（6 天以上最高"中"，10 天以上一律"低"） | `process/blend.py` |
+| 融合（前 10 天） | 按预报时效的经验权重：0–48h 高分辨率模型（HRRR、RRFS、HRDPS、NBM、AROME、ICON-CH）权重大，3–10 天以 ECMWF / NBM / GFS 为主；缺数据的模型自动剔除并重新归一 | `process/blend.py`、`config.py` |
+| 集合预报 | ECMWF ENS 51、GEFS 31、GEPS 21、ICON-EPS 40 个成员的逐小时降雪，按山腰海拔请求（Open-Meteo 会把每个成员的气温订正到这个海拔再分雨雪）。按滑雪日汇总后，先按融合的雪水比换算，再乘一个每雪场的系数，使未来 10 天集合平均总量等于融合（全球集合在山区系统性偏干；系数限制在 0.5–2.5）。合并时 ECMWF 算 2 份、其他各 1 份，平均分给各成员 | `ingest/open_meteo_ensemble.py`、`process/ensemble.py` |
+| 范围 | 集合成员的加权 10% / 90% 分位（扩到包含点值）；没有集合时退回模型间范围 | `process/blend.py` |
+| 信心 | 落在点值 ±50%（至少 ±5 cm）以内的成员比例：≥ 50% 高，≥ 25% 中，否则低；7 天以上最高"中" | `process/blend.py` |
+| 第 11–16 天 | 不发布单一数值，只发布分位数和"至少 2.5 cm / 15 cm"的概率（达到阈值的成员占比） | `publish/build.py` |
+| 第 3–5 周 | 35 天的 GEFS 和 GEPS 的周累计降雪（山腰）：中位数、10–90% 和 ≥15 / 30 / 60 cm 的概率 | `publish/build.py` |
 | 夜间 / 白天 | 滑雪日 D：夜间 = 前一天 16:00 → 当天 08:00，白天 = 08:00 → 16:00（雪场当地时间） | `process/aggregate.py` |
 
 ### 回测示例：2024 年 3 月内华达山暴雪
@@ -74,9 +98,10 @@ TokenFlyAI/snow（本仓库，公开）                       ccyjava/tokenfly�
 ```bash
 # 数据管道（Python 3.11+）
 pip install -r requirements.txt
-python -m pytest -q                              # 68 个单元测试 + 回测
-python -m pipeline.run --out site/data/v1        # 抓取并生成 JSON（约 10 秒，约 270 次加权 API 调用）
-python -m pipeline.run --resorts alta,vail       # 只跑部分雪场
+python -m pytest -q                              # 单元测试 + 回测 + 预算检查
+python -m pipeline.run --out site/data/v1 --mode full --previous none   # 全部雪场全量（约 10 分钟，约 4,500 次加权调用）
+python -m pipeline.run --resorts alta,vail --mode full --previous none  # 只跑部分雪场
+python -m pipeline.run --out site/data/v1        # 按计划：只刷新到期的雪场，其余从线上上一版带过
 
 # 前端（Node 20+）
 cd web && npm install
@@ -87,18 +112,21 @@ NEXT_PUBLIC_DATA_BASE=/snow/data/v1 npm run build   # 本地数据；不设则�
 
 ## 如何加雪场
 
-1. 在 `data/resorts.yaml` 的 `resorts:` 下加一条（字段说明在文件头部）。坐标取主雪道区域中心（OSM `landuse=winter_sports` 的中心点），不要用山脚小镇；海拔和坐标各写明来源，拿不准的标 `needs_review: true`。
-2. 新区域要在 `regions:` 里加一行。
-3. `python -m pytest -q`（会校验整个雪场库），然后提交推送：数据在下一次定时运行时自动包含新雪场。
-4. 运行 `scripts/deploy_shell.sh` 并推送主站仓库，新雪场的页面才会出现（外壳里有每个雪场的静态路由）。
+`data/resorts.yaml` 分两部分：标记行以上是第一阶段的 10 个雪场，手工维护；标记行以下由 `scripts/build_resorts.py` 根据 `data/resort_seed.txt` 生成，不要直接改。
 
-新国家需要区域模型时，在 `pipeline/config.py` 的 `MODELS` 里加一条 `ModelSpec` 并在 `BLEND_WEIGHTS` 里给权重。
+1. 在 `data/resort_seed.txt` 加一行（格式在文件头部）：名称、通行证、大致位置、公开的山脚 / 山顶海拔。多山头目的地每个山头一行，共用 `destination`。
+2. `python scripts/build_resorts.py`：查 OSM `landuse=winter_sports` 多边形定坐标（没有就用索道站点的中心），查维基信息框和雪场公布的海拔，再用 OSM 索道站点在高程模型上的海拔核对；来源不一致或靠猜的标 `needs_review: true` 并在 `notes` 写原因。网络结果缓存在 `raw/build_resorts/`，报告在 `raw/build_resorts/report.md`。
+3. 新区域要在 `regions:` 里加一行。想让它每 6 小时更新就加进 `data/featured.yaml`（`tests/test_budget.py` 会检查额度）。
+4. `python -m pytest -q`（会校验整个雪场库和额度），然后提交推送：数据在下一次定时运行时自动包含新雪场。
+5. 运行 `scripts/deploy_shell.sh` 并推送主站仓库，新雪场的页面才会出现（外壳里有每个雪场的静态路由）。
+
+新国家需要区域模型时，在 `pipeline/config.py` 的 `MODELS` 里加一条 `ModelSpec` 并在 `BLEND_WEIGHTS` 里给权重；每个雪场最多 8 个模型（模型图只有 8 个固定颜色），standard 档用哪个区域模型在 `_regional_pick()` 里定。
 
 ## 部署
 
 | 什么 | 怎么更新 |
 |---|---|
-| 预报数据 | 全自动：`.github/workflows/forecast.yml` 每天 02:37 / 08:37 / 14:37 / 20:37 UTC 运行，也可在 Actions 页手动触发。失败时不发布（线上保留上一版）并自动开一个 issue |
+| 预报数据 | 全自动：`.github/workflows/forecast.yml` 每天 02:37 / 08:37 / 14:37 / 20:37 UTC 运行，也可在 Actions 页手动触发（手动触发也只刷新到期的雪场）。失败时不发布（线上保留上一版）并自动开一个 issue；少于 90% 的雪场有数据时也不发布 |
 | 页面外壳 | `scripts/deploy_shell.sh` 构建并复制到 `../tokenfly/aiverse/snow/`，然后在主站仓库里提交推送，Render 自动部署 |
 | 主站路由 | 主站仓库的 `snow_site.py`（`register_snow(app)`）：`/snow` → 302 `/snow/`，目录自动找 `index.html`，带路径穿越校验 |
 
@@ -106,9 +134,11 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 
 ## 数据来源与署名
 
-- [Open-Meteo](https://open-meteo.com/)（CC BY 4.0）：ECMWF IFS / AIFS、NOAA GFS / NBM / HRRR / RRFS、DWD ICON、加拿大 GEM / HRDPS、JMA。免费档仅限非商用：600 次/分钟、5,000 次/小时、10,000 次/天；超过 10 个变量或 14 天按比例多计。
+- [Open-Meteo](https://open-meteo.com/)（CC BY 4.0）：ECMWF IFS / AIFS、NOAA GFS / NBM / HRRR / RRFS、DWD ICON、加拿大 GEM / HRDPS、JMA、Météo-France AROME / ARPEGE、MeteoSwiss ICON-CH、英国气象局全球模型、CMA GRAPES；集合预报 ECMWF ENS、GEFS、GEPS、ICON-EPS。免费档仅限非商用：600 次/分钟、5,000 次/小时、10,000 次/天；超过 10 个变量或 14 天按比例多计，集合的每个成员算一个变量。
+- 底图：[OpenFreeMap](https://openfreemap.org/)（免密钥），© OpenStreetMap 贡献者。
 - 回测观测：[USDA NRCS SNOTEL](https://www.nrcs.usda.gov/wps/portal/wcc/home/)（公有领域）。
-- 雪场坐标：© OpenStreetMap 贡献者（ODbL）；海拔：维基百科与雪场官网。
+- 雪场坐标与索道：© OpenStreetMap 贡献者（ODbL），经 Overpass API；海拔：维基百科与雪场官网，用 Mapzen 地形数据（经 Open Topo Data）核对。
+- 雪场名单：ikonpass.com 与 epicpass.com 的 2026-27 通行证页面（2026-11-11 核对）。
 
 页面的「数据与方法」页会显示每次运行的模型状态和来源。
 
@@ -116,15 +146,15 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 
 - 各海拔的降水量相同，没有做地形增幅；模型格点降水本身在陡峭地形上会偏少或偏多。
 - 雪水比的风修正、融合权重都是经验值，第 4 阶段的验证系统会按雪场用实测替换。
-- 信心目前只看确定性模型之间的分歧，还没有接入集合预报。
-- 10 天以后的逐日数值只有趋势参考价值，页面上做了淡化显示。
-- Whistler Blackcomb（山顶海拔两个来源不一致）和 Niseko Grand Hirafu（坐标为估计）标了 `needs_review`。
+- 集合预报只有山腰一个海拔；山脚 / 山顶的分位数按融合里的海拔比例缩放。订正系数是"让集合平均等于融合"，不是用实测校准的，第 4 阶段验证后再改。
+- standard 档的雪场一天只更新一次，集合只有 GEFS（31 个成员），范围比 featured 雪场粗。
+- 46 个雪场标了 `needs_review`（坐标或海拔来源不一致、靠猜），清单见 `docs/phase2-handoff.md` §5。
 - Open-Meteo 文档显示 HRRR、ICON Global 等标有停用日期（未能二次确认）；模型缺数据时会被自动剔除并在页面标注。
 
 ## 路线图
 
 1. ✅ MVP：10 个雪场、多模型抓取、订正 + 雪线 + 雪水比、详情页、收藏、自动更新
-2. 集合预报（ECMWF ENS、GEFS、GEM）+ 概率与信心；地图和排行榜；周尺度展望；Ikon / Epic 全部雪场。注意额度：全量每点约 30 次加权调用，约 280 个点做不到每 6 小时全量，需要分档（重点雪场每 6 小时、其余每天一次精简模型集）
+2. ✅ 集合预报（ECMWF ENS、GEFS、GEPS、ICON-EPS）+ 概率与信心；地图和排行榜；第 3–5 周展望；Ikon / Epic 全部雪场；欧洲区域模型；分档更新
 3. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
 4. SNOTEL / 雪场雪报验证 + 自适应权重 + 准确率页面
 5. 登录与跨设备同步（Supabase）、邮件粉雪警报、月 / 季展望、数据迁移到 Cloudflare R2

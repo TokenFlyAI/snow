@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { fmtDate } from "@/lib/i18n";
-import type { Level, ResortDoc } from "@/lib/types";
+import type { Daily, Level, ResortDoc } from "@/lib/types";
 import { fmtSnow, snowUnit, snowValue } from "@/lib/units";
 import { useUser } from "../Providers";
 import { axisStyle, baseOption, EChart, type Palette } from "./EChart";
@@ -10,6 +10,8 @@ import { axisStyle, baseOption, EChart, type Palette } from "./EChart";
 const SLOT: Record<string, number> = {
   ecmwf_ifs025: 0, gfs_global: 1, ncep_nbm_conus: 2, icon_seamless: 3,
   ecmwf_aifs025_single: 4, gem_global: 5, ncep_hrrr_conus: 6, gem_hrdps_continental: 6, jma_seamless: 6, ncep_rrfs_conus: 7,
+  // regions never overlap, so regional models can share slots: NBM's slot is free outside the US
+  ukmo_seamless: 2, meteofrance_seamless: 6, meteoswiss_icon_seamless: 7, cma_grapes_global: 7,
 };
 
 export function ModelChart({ doc, level }: { doc: ResortDoc; level: Level }) {
@@ -17,7 +19,7 @@ export function ModelChart({ doc, level }: { doc: ResortDoc; level: Level }) {
   const [view, setView] = useState<"chart" | "table">("chart");
   const models = doc.models.filter((m) => m.status === "ok" && doc.by_model_daily_cm[m.id])
     .sort((a, b) => (SLOT[a.id] ?? 9) - (SLOT[b.id] ?? 9));
-  const days = doc.daily;
+  const days = doc.daily.filter((d): d is Daily => d.kind === "point");
   const labels = days.map((d) => fmtDate(d.date, lang));
 
   const build = (p: Palette) => ({
@@ -36,7 +38,7 @@ export function ModelChart({ doc, level }: { doc: ResortDoc; level: Level }) {
     },
     xAxis: { type: "category", data: labels, ...axisStyle(p),
       axisLabel: { color: p.muted, fontSize: 11, interval: 0, formatter: (v: string) => v.replace(" ", "\n") } },
-    yAxis: { type: "value", name: snowUnit(units), nameTextStyle: { color: p.muted, fontSize: 11, align: "right" }, minInterval: 1, ...axisStyle(p), axisLine: { show: false } },
+    yAxis: { type: "value", min: 0, name: snowUnit(units), nameTextStyle: { color: p.muted, fontSize: 11, align: "right" }, minInterval: 1, ...axisStyle(p), axisLine: { show: false } },
     series: [
       ...models.map((m) => ({
         name: m.label, type: "bar", barMaxWidth: 6, barGap: "15%", barCategoryGap: "24%",

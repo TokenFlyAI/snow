@@ -268,14 +268,19 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
     # ski-day totals (today's ski day started at 16:00 yesterday) with the ensemble range;
     # days without a point value contribute the ensemble mean
     fill = {0: blend_mid[0]} if n_point else None
-    totals = {}
-    for label, n_days in (("3d", 3), ("7d", 7), ("16d", DAILY_DAYS)):
+    def window_cm(n_days: int) -> dict[str, float]:
+        """Forecast total of the first n ski days: point values, then the ensemble mean."""
         cm = {}
         for lv in LEVELS:
             x = tot_lv(lv, range(n_days))
             for e in daily[n_point:n_days]:
                 x += e["ens"]["mean"][lv] or 0.0
             cm[lv] = x
+        return cm
+
+    totals = {}
+    for label, n_days in (("3d", 3), ("7d", 7), ("16d", DAILY_DAYS)):
+        cm = window_cm(n_days)
         complete = len(daily) >= n_days
         ratios = {lv: ens.level_ratio(cm[lv], cm["mid"]) for lv in LEVELS}
         st = None
@@ -288,6 +293,32 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
             "days": min(n_days, len(daily)), "complete": complete,
         }
     summary["totals"] = totals
+
+    # ---- accumulation from today on: forecast line plus the spread of the members' own
+    # accumulations (not a sum of daily percentiles), so the range widens with lead time
+    cumulative: list[dict] = []
+    if pool.n_members:
+        keys = ("min", "p10", "p50", "p90", "max")
+        prev = {key: {lv: 0.0 for lv in LEVELS} for key in keys}
+        for k in range(len(daily)):
+            tot = ens.window_totals(values, range(k + 1), fill=fill)
+            fin = tot[np.isfinite(tot)]
+            if fin.size < ens.MIN_MEMBERS:
+                break
+            cm = window_cm(k + 1)
+            p10, p50, p90 = ens.weighted_quantiles(tot, weights, (0.1, 0.5, 0.9))
+            mid = {"min": float(fin.min()), "p10": p10, "p50": p50, "p90": p90, "max": float(fin.max())}
+            entry = {"date": dates[k].isoformat(), "lead_days": k, "n_members": int(fin.size),
+                     "cm": {lv: _r(cm[lv]) for lv in LEVELS}}
+            for key in keys:
+                row = {}
+                for lv in LEVELS:
+                    x = mid[key] * ens.level_ratio(cm[lv], cm["mid"])
+                    # the forecast line stays inside the fan; an accumulation never shrinks
+                    x = min(x, cm[lv]) if key in ("min", "p10") else max(x, cm[lv]) if key in ("p90", "max") else x
+                    row[lv] = prev[key][lv] = max(x, prev[key][lv])
+                entry[key] = {lv: _r(row[lv]) for lv in LEVELS}
+            cumulative.append(entry)
     summary["snow_16d_cm"] = totals["16d"]["cm"]
     # today's ski day ends at 16:00 local time: after that its snow is no longer "next"
     over = now.astimezone(idx.local_start[0].tzinfo).hour >= NIGHT_START_H
@@ -339,6 +370,7 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
         "daily": [e for e in daily if e["kind"] == "point"],
         "daily_prob": [e for e in daily if e["kind"] == "prob"],
         "outlook": outlook,
+        "cumulative": cumulative,
         "by_model_daily_cm": by_model,
     }
 

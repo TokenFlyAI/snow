@@ -87,9 +87,17 @@ export interface Hourly {
   cloud_pct: (number | null)[]; visibility_m: (number | null)[];
 }
 
+/** Snowfall accumulated from today through this day: forecast line and the spread of the members' accumulations. */
+export interface CumulativeDay {
+  date: string; lead_days: number; n_members: number;
+  cm: ByLevel; min: ByLevel; p10: ByLevel; p50: ByLevel; p90: ByLevel; max: ByLevel;
+}
+
 export interface ResortDoc {
   schema_version: number; generated_at: string; resort: ResortMeta; models: ModelInfo[];
   ensemble: EnsembleInfo | null; outlook: OutlookWeek[];
+  /** absent in documents published before the fan chart, empty without an ensemble */
+  cumulative?: CumulativeDay[];
   summary: Summary; hourly: Hourly;
   /** point days (D+0..D+9); older documents also carried the probability days here */
   daily: DayEntry[];

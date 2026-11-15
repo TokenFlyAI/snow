@@ -167,6 +167,19 @@ def test_build_resort_with_ensemble_publishes_ranges_probabilities_and_outlook()
         assert t[k]["low_cm"]["mid"] <= t[k]["cm"]["mid"] <= t[k]["high_cm"]["mid"]
     assert doc["summary"]["snow_16d_cm"] == t["16d"]["cm"]
 
+    # accumulation fan: one entry per day, forecast line inside it, never shrinking, widening with lead
+    cum = doc["cumulative"]
+    assert [c["lead_days"] for c in cum] == list(range(16))
+    assert cum[6]["cm"] == t["7d"]["cm"] and cum[15]["cm"] == t["16d"]["cm"]
+    for a, b in zip(cum, cum[1:]):
+        for key in ("min", "p10", "cm", "p90", "max"):
+            assert b[key]["mid"] >= a[key]["mid"]
+    for c in cum:
+        assert c["min"]["mid"] <= c["p10"]["mid"] <= c["cm"]["mid"] <= c["p90"]["mid"] <= c["max"]["mid"]
+        assert c["p10"]["mid"] <= c["p50"]["mid"] <= c["p90"]["mid"]
+    width = [c["max"]["mid"] - c["min"]["mid"] for c in cum]
+    assert width[15] > width[7] > width[1]
+
 
 def test_stale_ensemble_file_is_realigned_by_date():
     r = make_resort()

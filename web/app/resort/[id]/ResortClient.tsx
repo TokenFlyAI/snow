@@ -1,5 +1,6 @@
 "use client";
 import { FollowButton, LevelPicker, LoadState, PassBadges, resortName, Updated } from "@/components/Bits";
+import { CumulativeChart } from "@/components/charts/CumulativeChart";
 import { DailyChart } from "@/components/charts/DailyChart";
 import { HourlyCharts } from "@/components/charts/HourlyCharts";
 import { ModelChart } from "@/components/charts/ModelChart";
@@ -30,6 +31,7 @@ export default function ResortClient({ id }: { id: string }) {
   const s = data?.summary;
   const point = (data?.daily ?? []).filter((d): d is Daily => d.kind === "point");
   const prob = [...(data?.daily ?? []).filter((d): d is ProbDay => d.kind === "prob"), ...(data?.daily_prob ?? [])];
+  const cum = data?.cumulative ?? [];
   const t16 = s?.totals?.["16d"];
   const confDot = (d: Daily) => ({ high: "var(--good)", medium: "var(--warning)", low: "var(--critical)" }[d.confidence]);
 
@@ -75,6 +77,32 @@ export default function ResortClient({ id }: { id: string }) {
               ? <>{t("nextSnow")}: <b className="text-ink">{fmtDate(s.next_snow.date, lang)}</b> · {fmtSnow(s.next_snow.snow_cm[level], units)}</>
               : t("noSnowAhead")}
           </p>
+
+          {cum.length > 1 && (
+            <Section title={`${t("cumTitle")} · ${t(level)}`} hint={t("cumHint")}>
+              <CumulativeChart days={cum} level={level} />
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-ink-2">{t("showTable")}</summary>
+                <div className="scroll-x mt-2">
+                  <table className="data num">
+                    <thead>
+                      <tr><th>{t("date")}</th><th>{t("cumMin")}</th><th>10%</th><th>{t("cumForecast")}</th><th>90%</th><th>{t("cumMax")}</th></tr>
+                    </thead>
+                    <tbody>
+                      {cum.map((d) => (
+                        <tr key={d.date}>
+                          <td>{d.lead_days === 0 ? t("today") : fmtDate(d.date, lang)}</td>
+                          <td>{fmtSnow(d.min[level], units)}</td><td>{fmtSnow(d.p10[level], units)}</td>
+                          <td className="font-semibold">{fmtSnow(d.cm[level], units)}</td>
+                          <td>{fmtSnow(d.p90[level], units)}</td><td>{fmtSnow(d.max[level], units)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </Section>
+          )}
 
           <Section title={`${t("daily")} · ${t(level)}`} hint={t("dailyHint")}>
             <DailyChart daily={[...point, ...prob]} level={level} />

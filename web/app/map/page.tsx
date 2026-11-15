@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LevelPicker, LoadState, PassBadges, resortName, Updated } from "@/components/Bits";
+import { LevelPicker, LoadState, RegionSelect, PassBadges, resortName, Updated } from "@/components/Bits";
 import { SNOW_RAMP, SnowMap, type MapPoint } from "@/components/map/SnowMap";
 import { useUser } from "@/components/Providers";
 import { ResortCard } from "@/components/ResortCard";
 import { useIndex } from "@/lib/data";
 import type { WindowKey } from "@/lib/types";
+import { inRegion, regionLabel } from "@/lib/regions";
 import { fmtSnow, snowUnit } from "@/lib/units";
 import { WINDOWS, windowValue } from "@/lib/windows";
 
@@ -26,15 +27,15 @@ export default function MapPage() {
   const rows = useMemo(() => (data ? data.resorts.map((r) => ({ r, v: windowValue(r, win, level) })) : []), [data, win, level]);
   const points: MapPoint[] = useMemo(() => rows.map(({ r, v }) => ({
     id: r.id, name: resortName(r, lang), lon: r.lon, lat: r.lat, cm: v.cm, label: fmtSnow(v.cm, units),
-    inView: region === "all" || r.region === region,
+    inView: inRegion(region, r.region),
   })), [rows, lang, units, region]);
   if (!ready) return null;
 
   const theme = resolvedTheme === "dark" ? "dark" : "light";
   const ramp = SNOW_RAMP[theme];
-  const usedRegions = data ? data.regions.filter((g) => data.resorts.some((r) => r.region === g.id)) : [];
+  const used = new Set(data?.resorts.map((r) => r.region) ?? []);
   const regionOf = (id: string) => data?.regions.find((g) => g.id === id);
-  const list = rows.filter(({ r }) => region === "all" || r.region === region).sort((a, b) => b.v.cm - a.v.cm);
+  const list = rows.filter(({ r }) => inRegion(region, r.region)).sort((a, b) => b.v.cm - a.v.cm);
   const sel = selected ? data?.resorts.find((r) => r.id === selected) : undefined;
   const classLabel = (i: number) => (i < 0 ? `< ${breaks[0]}` : i === breaks.length - 1 ? `${breaks[i]}+` : `${breaks[i]}–${breaks[i + 1]}`);
 
@@ -49,11 +50,7 @@ export default function MapPage() {
           {WINDOWS.map((w) => <button key={w.key} className="chip" aria-pressed={win === w.key} onClick={() => setWin(w.key)}>{t(w.label)}</button>)}
         </div>
         <LevelPicker />
-        <select value={region} onChange={(e) => { setRegion(e.target.value); setSelected(null); }} aria-label={t("region")}
-          className="h-8 min-w-0 max-w-[11rem] rounded-full border border-line bg-surface px-3 text-[13px] text-ink-2">
-          <option value="all">{t("allRegions")}</option>
-          {usedRegions.map((g) => <option key={g.id} value={g.id}>{lang === "zh" ? g.name_zh : g.name}</option>)}
-        </select>
+        <RegionSelect value={region} onChange={(v) => { setRegion(v); setSelected(null); }} regions={data?.regions ?? []} used={used} />
       </div>
       <p className="mt-2 text-xs leading-5 text-ink-3">{t("mapHint")}</p>
       <LoadState loading={loading} error={error} />
@@ -83,7 +80,7 @@ export default function MapPage() {
 
           <section className="mt-5">
             <h2 className="mb-2 text-sm font-semibold text-ink-2">
-              {region === "all" ? t("allRegions") : (lang === "zh" ? regionOf(region)?.name_zh : regionOf(region)?.name)}
+              {region === "all" ? t("allRegions") : regionLabel(region, lang, data?.regions ?? [])}
               {" · "}{list.length} {t("resortsCount")} · {t(WINDOWS.find((w) => w.key === win)!.label)} · {t(level)}
             </h2>
             <ul className="card divide-y divide-line">

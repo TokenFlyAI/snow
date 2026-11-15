@@ -1,6 +1,6 @@
 {
-  "name": "雪报 Snow",
-  "short_name": "雪报",
+  "name": "Snow Forecast · 雪报",
+  "short_name": "Snow",
   "description": "多模型融合的滑雪场降雪预报",
   "start_url": "/snow/",
   "scope": "/snow/",

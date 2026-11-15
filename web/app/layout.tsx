@@ -7,11 +7,11 @@ import "./globals.css";
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "/snow";
 
 export const metadata: Metadata = {
-  title: "雪报 Snow · tokenfly.ai",
-  description: "多模型融合的滑雪场降雪预报 · Multi-model snow forecasts for Ikon and Epic resorts",
+  title: "Snow Forecast · tokenfly.ai",
+  description: "Multi-model snow forecasts for Ikon and Epic resorts · 多模型融合的滑雪场降雪预报",
   manifest: `${base}/manifest.webmanifest`,
   icons: { icon: `${base}/icon.svg`, apple: `${base}/apple-touch-icon.png` },
-  appleWebApp: { capable: true, title: "雪报", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Snow", statusBarStyle: "default" },
 };
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, viewportFit: "cover",
@@ -23,7 +23,7 @@ const themeScript = `(function(){try{var s=JSON.parse(localStorage.getItem('snow
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body>
         <Providers>

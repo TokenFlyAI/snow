@@ -18,25 +18,29 @@ export interface UserState {
   level: Level;
 }
 
-export const DEFAULT_STATE: UserState = { favorites: [], units: "imperial", lang: "zh", theme: "system", level: "mid" };
+export const DEFAULT_STATE: UserState = { favorites: [], units: "imperial", lang: "en", theme: "system", level: "mid" };
 
 export interface UserStore {
   load(): UserState;
   save(state: UserState): void;
 }
 
-const KEY = "snow.user.v1";
+const KEY = "snow.user.v2";
+/** v1 always stored a language, defaulting to Chinese: on migration keep everything except that default. */
+const OLD_KEY = "snow.user.v1";
 
 export class LocalStore implements UserStore {
   load(): UserState {
     try {
       const raw = window.localStorage.getItem(KEY);
-      if (!raw) return { ...DEFAULT_STATE };
-      const p = JSON.parse(raw) as Partial<UserState>;
+      const old = raw ? null : window.localStorage.getItem(OLD_KEY);
+      if (!raw && !old) return { ...DEFAULT_STATE };
+      const p = JSON.parse((raw ?? old) as string) as Partial<UserState>;
+      if (!raw) delete p.lang;
       return {
         favorites: Array.isArray(p.favorites) ? p.favorites.filter((x) => typeof x === "string") : [],
         units: p.units === "metric" ? "metric" : "imperial",
-        lang: p.lang === "en" ? "en" : "zh",
+        lang: p.lang === "zh" ? "zh" : "en",
         theme: p.theme === "light" || p.theme === "dark" ? p.theme : "system",
         level: p.level === "base" || p.level === "summit" ? p.level : "mid",
       };

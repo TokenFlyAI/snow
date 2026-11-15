@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { LevelPicker, LoadState, PassBadges, resortName, Updated } from "@/components/Bits";
+import { LevelPicker, LoadState, PassBadges, RegionSelect, resortName, Updated } from "@/components/Bits";
 import { useUser } from "@/components/Providers";
 import { useIndex } from "@/lib/data";
 import type { WindowKey } from "@/lib/types";
+import { inRegion } from "@/lib/regions";
 import { fmtSnow } from "@/lib/units";
 import { WINDOWS, windowValue } from "@/lib/windows";
 
@@ -22,7 +23,7 @@ export default function Rank() {
   const rows = useMemo(() => {
     if (!data) return [];
     return data.resorts
-      .filter((r) => (pass === "all" || r.passes[pass]) && (region === "all" || r.region === region))
+      .filter((r) => (pass === "all" || r.passes[pass]) && inRegion(region, r.region))
       .map((r) => ({ r, v: windowValue(r, win, level) }))
       .sort((a, b) => b.v.cm - a.v.cm);
   }, [data, win, pass, region, level]);
@@ -33,7 +34,7 @@ export default function Rank() {
   const max = Math.max(1, ...shown.map((x) => Math.max(x.v.cm, x.v.high ?? 0)));
   const pct = (cm: number) => `${Math.min(100, (cm / max) * 100)}%`;
   const regionName = (id: string) => { const g = data?.regions.find((x) => x.id === id); return g ? (lang === "zh" ? g.name_zh : g.name) : id; };
-  const usedRegions = data ? data.regions.filter((g) => data.resorts.some((r) => r.region === g.id)) : [];
+  const used = new Set(data?.resorts.map((r) => r.region) ?? []);
 
   return (
     <div>
@@ -51,11 +52,7 @@ export default function Rank() {
         {(["all", "ikon", "epic"] as PassFilter[]).map((p) => (
           <button key={p} className="chip" aria-pressed={pass === p} onClick={() => setPass(p)}>{p === "all" ? t("all") : p === "ikon" ? "Ikon" : "Epic"}</button>
         ))}
-        <select value={region} onChange={(e) => { setRegion(e.target.value); setAll(false); }} aria-label={t("region")}
-          className="h-8 min-w-0 max-w-[11rem] rounded-full border border-line bg-surface px-3 text-[13px] text-ink-2">
-          <option value="all">{t("allRegions")}</option>
-          {usedRegions.map((g) => <option key={g.id} value={g.id}>{lang === "zh" ? g.name_zh : g.name}</option>)}
-        </select>
+        <RegionSelect value={region} onChange={(v) => { setRegion(v); setAll(false); }} regions={data?.regions ?? []} used={used} />
       </div>
       <p className="mt-3 text-xs leading-5 text-ink-3">{t("rankHint")}</p>
       <LoadState loading={loading} error={error} />

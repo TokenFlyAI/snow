@@ -36,9 +36,9 @@ export function Header() {
         <nav className="scroll-x mt-3 flex gap-5 whitespace-nowrap">
           {tab("/", t("myResorts"))}
           {tab("/map", t("map"))}
-          {tab("/rank", t("rank"))}
-          {tab("/resorts", t("allResorts"))}
-          {tab("/about", t("about"))}
+          {tab("/rank", t("navRank"))}
+          {tab("/resorts", t("navResorts"))}
+          {tab("/about", t("navAbout"))}
         </nav>
       </div>
     </header>

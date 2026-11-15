@@ -121,7 +121,8 @@ def test_windows(scored):
 
 def test_recent_pairs(scored):
     rec = {(r["resort_id"], r["date"]): r for r in scored["recent"]}
-    assert set(rec) == {("a", "2026-12-10"), ("a", "2026-12-11"), ("b", "2026-12-10")}     # 2 Nov is older than 30 days
+    # 2 Nov is older than 30 days; 11 Dec only has a forecast 2 days ahead
+    assert set(rec) == {("a", "2026-12-10"), ("b", "2026-12-10")}
     a = rec[("a", "2026-12-10")]
     assert a["obs_snow_cm"] == 16 and a["forecast"]["1"]["snow_cm"] == 20 and a["forecast"]["1"]["high_cm"] == 30
     assert "3" not in a["forecast"] and rec[("b", "2026-12-10")]["flags"] == ["depth_fell"]

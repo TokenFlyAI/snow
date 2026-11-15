@@ -129,3 +129,6 @@ export interface Manifest {
     daily_limit?: number; daily_target?: number };
   sources: { name: string; url: string; license: string }[]; attribution: string;
 }
+
+/** trend/{id}.json: mid-mountain snow of each ski day in the last issues (pipeline/publish/trend.py). */
+export interface TrendDoc { schema_version: number; resort_id: string; generated_at: string; issues: string[]; days: Record<string, (number | null)[]> }

@@ -139,6 +139,7 @@ const dict = {
   farOut: { zh: "第 11 天起只给概率", en: "Probabilities only from day 11" },
   mountain: { zh: "参考海拔", en: "Elevation shown" },
   navPlan: { zh: "去哪滑", en: "Plan" },
+  changeHint: { zh: "全天降雪后面的小数字：和约一天前那次预报相比的变化（绿色多了、红色少了）。", en: "Small number after a total: change against the forecast issued about a day earlier (green more, red less)." },
   measuredTitle: { zh: "附近实测", en: "Measured nearby" },
   measuredHint: { zh: "附近 SNOTEL 自动站的读数，按和预报相同的滑雪日（前一天 16:00 到当天 16:00）汇总。新雪是下限：新雪一边下一边压实。降水是雨量计读数，大风中会少测。", en: "Readings of a nearby SNOTEL station, summed over the same ski days as the forecast (4 pm the day before to 4 pm). New snow is a lower bound: fresh snow settles as it falls. Precipitation is the gauge reading, which under-catches in wind." },
   measuredNewSnow: { zh: "新雪", en: "New snow" },

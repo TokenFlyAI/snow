@@ -39,6 +39,7 @@ from .publish.build import build_index, build_manifest, build_resort, split_dail
 from .publish.obs_docs import build_obs_docs
 from .publish.ics import write_feeds
 from .publish.planner import build_planner
+from .publish.trend import build_trends
 from .resorts import Resort, load_resorts
 from .state import DEFAULT_PREVIOUS, Previous, age_hours, parse_time
 from .verify import archive
@@ -289,6 +290,13 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
                                       archive_dir=archive_dir)
     if archive_dir is not None:
         run_info["verification"] = publish_verification(out_dir, archive_dir, db.resorts, now, prev)
+        try:
+            trends = build_trends(archive_dir, now)
+            for rid, doc in trends.items():
+                _write(out_dir / "trend" / f"{rid}.json", doc)
+            run_info["trends"] = len(trends)
+        except Exception as e:  # noqa: BLE001  the trend is an extra: never stop a publish
+            log.warning("forecast trends not written: %s", e)
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
     planner = build_planner(db.regions, docs, now)
     _write(out_dir / "planner.json", planner)

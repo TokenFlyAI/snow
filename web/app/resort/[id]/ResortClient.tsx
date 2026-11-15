@@ -7,11 +7,24 @@ import { ModelChart } from "@/components/charts/ModelChart";
 import { OutlookWeeks, ProbDays } from "@/components/Outlook";
 import { Measured } from "@/components/Measured";
 import { useUser } from "@/components/Providers";
-import { useResort } from "@/lib/data";
+import { trendChange, useResort, useTrend } from "@/lib/data";
 import { fmtDate, fmtProb, fmtUpdated } from "@/lib/i18n";
 import { REGIONS, resortById } from "@/lib/resorts";
 import type { Daily, ProbDay } from "@/lib/types";
 import { fmtHeight, fmtPrecip, fmtSnow, fmtTemp, fmtWind } from "@/lib/units";
+
+/** Small "+3″" / "−2″" after a total: change against the forecast of about a day earlier (mid-mountain). */
+function Change({ cm }: { cm: number | null }) {
+  const { units } = useUser();
+  if (cm == null) return null;
+  const v = units === "imperial" ? cm / 2.54 : cm;
+  if (Math.abs(v) < 0.5) return null;
+  return (
+    <span className="ml-1 text-[11px]" style={{ color: v > 0 ? "var(--good)" : "var(--critical)" }}>
+      {v > 0 ? "+" : "−"}{fmtSnow(Math.abs(cm), units)}
+    </span>
+  );
+}
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -27,6 +40,7 @@ export default function ResortClient({ id }: { id: string }) {
   const { t, ready, lang, units, level } = useUser();
   const meta = resortById(id);
   const { data, loading, error } = useResort(id);
+  const { data: trend } = useTrend(id);
   if (!ready || !meta) return null;
   const region = REGIONS.find((r) => r.id === meta.region);
   const s = data?.summary;
@@ -123,7 +137,10 @@ export default function ResortClient({ id }: { id: string }) {
                       <td>{d.lead_days === 0 ? t("today") : fmtDate(d.date, lang)}</td>
                       <td>{fmtSnow(d.snow_night_cm[level], units)}</td>
                       <td>{fmtSnow(d.snow_day_cm[level], units)}</td>
-                      <td className="font-semibold">{fmtSnow(d.snow_cm[level], units)}</td>
+                      <td className="whitespace-nowrap">
+                        <span className="font-semibold">{fmtSnow(d.snow_cm[level], units)}</span>
+                        <Change cm={level === "mid" ? trendChange(trend, d.date, data.generated_at) : null} />
+                      </td>
                       <td>{fmtSnow(d.snow_low_cm[level], units, false)}–{fmtSnow(d.snow_high_cm[level], units)}</td>
                       <td>{d.quality === "none" ? "–" : t(d.quality)}</td>
                       <td title={d.ens?.agreement != null ? `${t("agreement")} ${fmtProb(d.ens.agreement)}` : undefined}>
@@ -140,6 +157,9 @@ export default function ResortClient({ id }: { id: string }) {
                 </tbody>
               </table>
             </div>
+            {level === "mid" && point.some((d) => trendChange(trend, d.date, data.generated_at) != null) && (
+              <p className="mt-2 text-xs text-ink-3">{t("changeHint")}</p>
+            )}
             <ProbDays days={prob} level={level} />
             {data.ensemble && (
               <p className="mt-3 text-xs leading-5 text-ink-3">

@@ -28,14 +28,16 @@ from pathlib import Path
 from typing import Optional
 
 from .config import (DAILY_DAYS, ENSEMBLES, FRESH_WITHIN_H, MODELS, OUTLOOK_WEEKS, STALE_AFTER_H, current_slot,
-                     ensembles_for, estimate_daily_calls, load_featured, models_for, refresh_slot)
+                     ensembles_for, estimate_daily_calls, last_slot_time, load_featured, models_for, refresh_slot)
 from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, hourly_vars, make_client
 from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
 from .publish.build import build_index, build_manifest, build_resort, split_daily
+from .publish.planner import build_planner
 from .resorts import Resort, load_resorts
-from .state import DEFAULT_PREVIOUS, Previous, age_hours
+from .state import DEFAULT_PREVIOUS, Previous, age_hours, parse_time
+from .verify import archive
 
 log = logging.getLogger("pipeline")
 MIN_MODELS_OK = 2
@@ -66,7 +68,6 @@ def plan(resorts: list[Resort], featured: set[str], prev_index: Optional[dict], 
     else is missing from the previous data set is still filled in).
     """
     prev = {r["id"]: r for r in (prev_index or {}).get("resorts", [])}
-    slot = current_slot(now.hour)
     tasks = []
     for r in resorts:
         tier = "featured" if r.id in featured else "standard"
@@ -77,21 +78,29 @@ def plan(resorts: list[Resort], featured: set[str], prev_index: Optional[dict], 
         if p is None or p.get("tier") != tier:
             tasks.append(Task(r, tier, True, True, "new" if p is None else "tier changed"))
             continue
-        a_doc, a_ens = age_hours(p.get("generated_at"), now), age_hours(p.get("ensemble_at"), now)
-        due = mode == "auto" and refresh_slot(r.lon) == slot
+        opened = last_slot_time(refresh_slot(r.lon), now)
 
-        def needs(age: Optional[float]) -> bool:
-            return age is None or age > STALE_AFTER_H or (due and age > FRESH_WITHIN_H)
-        ens = needs(a_ens)
-        det = tier == "featured" or ens or needs(a_doc)
-        why = "featured" if tier == "featured" else "due" if due and det else "stale" if det else "carried"
+        def stale(stamp: Optional[str]) -> bool:
+            age = age_hours(stamp, now)
+            return age is None or age > STALE_AFTER_H
+
+        def due(stamp: Optional[str]) -> bool:
+            # made before the slot last opened (also when the slot's own run was skipped or late),
+            # but not right after a full run
+            t, age = parse_time(stamp), age_hours(stamp, now)
+            return mode == "auto" and t is not None and t < opened and age > FRESH_WITHIN_H
+
+        ens = stale(p.get("ensemble_at")) or due(p.get("ensemble_at"))
+        det = tier == "featured" or ens or stale(p.get("generated_at")) or due(p.get("generated_at"))
+        is_stale = stale(p.get("ensemble_at")) or stale(p.get("generated_at"))
+        why = "featured" if tier == "featured" else "carried" if not det else "stale" if is_stale else "due"
         tasks.append(Task(r, tier, det, ens, why))
     return tasks
 
 
 def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None = None,
         mode: str = "auto", previous: Optional[str] = DEFAULT_PREVIOUS, featured_path: str | None = None,
-        now: Optional[datetime] = None) -> int:
+        now: Optional[datetime] = None, archive_dir: Optional[Path] = None) -> int:
     db = load_resorts(resorts_path) if resorts_path else load_resorts()
     featured = set(load_featured(featured_path) if featured_path else load_featured())
     unknown = featured - {r.id for r in db.resorts}
@@ -166,6 +175,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         return 1
 
     docs, failed, n_carried = [], [], 0
+    issued: list[dict] = []          # documents built in this run (for the forecast archive)
     for t in tasks:
         resort = t.resort
         # ---- ensemble member totals: fresh, or the cached file from the last refresh ----
@@ -193,6 +203,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
                 donor = make_donor(first)
                 derived = [d if d.has_profile else derive(md, resort, donor) for d, md in zip(first, mds)]
                 doc = build_resort(resort, derived, now, missing_models=missing, ens_raw=ens_raw, tier=t.tier)
+                issued.append(doc)
                 s = doc["summary"]
                 log.debug("%-26s %-8s models=%d members=%d  24h=%s 72h=%s 7d=%s 16d=%s cm (mid)", resort.id, t.tier,
                           len(derived), sum(m["members"] for m in (doc["ensemble"] or {}).get("models", [])),
@@ -224,7 +235,14 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         "refreshed_deterministic": len(det_tasks), "refreshed_ensemble": len(ens_tasks),
         "carried_over": n_carried, "failed": failed,
     }
+    if archive_dir is not None:
+        try:
+            path = archive.write_run(archive_dir, issued, now)
+            log.info("archived %d issued forecasts -> %s", len(issued), path)
+        except Exception as e:  # noqa: BLE001  the archive must never stop a publish
+            log.warning("forecast archive not written: %s", e)
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
+    _write(out_dir / "planner.json", build_planner(db.regions, docs, now))
     # manifest is written last: its presence marks a complete run
     _write(out_dir / "manifest.json", build_manifest(now, status, len(docs), usage, ens_status, run_info, budget))
     log.info("published %d resorts (%d refreshed, %d carried over); this run ~%.0f weighted API calls %s; "
@@ -245,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
                          "featured: only the featured resorts")
     ap.add_argument("--previous", default=os.environ.get("SNOW_PREVIOUS", DEFAULT_PREVIOUS),
                     help="URL or directory of the last published data set, or 'none'")
+    ap.add_argument("--archive", default=os.environ.get("SNOW_ARCHIVE") or None,
+                    help="also write this run's issued forecasts to DIR/forecasts/... (see pipeline/verify/archive.py)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -252,7 +272,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     only = [s.strip() for s in args.resorts.split(",") if s.strip()] or None
-    return run(Path(args.out), only, args.resorts_file, args.mode, args.previous, args.featured_file)
+    return run(Path(args.out), only, args.resorts_file, args.mode, args.previous, args.featured_file,
+               archive_dir=Path(args.archive) if args.archive else None)
 
 
 if __name__ == "__main__":

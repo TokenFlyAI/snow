@@ -7,6 +7,7 @@ published manifest, so this list can stay generous.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -91,7 +92,7 @@ def _applies(m: ModelSpec, resort: Resort) -> bool:
 
 
 def _regional_pick(resort: Resort) -> str:
-    """The one extra model a standard-tier resort gets on top of ECMWF IFS and GFS."""
+    """The one regional model a standard-tier resort gets on top of the global ones."""
     c = resort.country
     if c == "US":
         return "ncep_nbm_conus" if resort.state not in CONUS_EXCLUDE else "icon_seamless"
@@ -100,20 +101,25 @@ def _regional_pick(resort: Resort) -> str:
     if c in ("JP", "KR", "CN"):
         return "jma_seamless"
     if c in ("FR", "CH", "IT", "AT", "AD"):
-        return "icon_seamless"       # ICON-D2 + ICON-EU nest
+        return "meteofrance_seamless"   # AROME 1.3 km / ARPEGE (ICON-D2 comes with icon_seamless)
     return "ukmo_seamless"
+
+
+# Global models every standard-tier resort gets. The 2024-26 backtest (docs/phase3-backtest-results.md):
+# a blend of ECMWF + GFS only has 8-16 % more error than one of 5 models, ECMWF + GFS + NBM 3-6 %.
+STANDARD_GLOBAL = ("ecmwf_ifs025", "gfs_global", "icon_seamless", "gem_global")
 
 
 def models_for(resort: Resort, tier: str = "featured") -> list[ModelSpec]:
     """Deterministic models fetched for a resort.
 
-    featured: every model that covers the resort.
-    standard: ECMWF IFS + GFS + the best regional model (3 models), to stay inside the API budget.
+    featured: every model that covers the resort (up to 8).
+    standard: ECMWF IFS, GFS, ICON, GEM + the best regional model (4-5 models), to stay inside the API budget.
     """
     full = [m for m in MODELS if _applies(m, resort)]
     if tier == "featured":
         return full
-    keep = {"ecmwf_ifs025", "gfs_global", _regional_pick(resort)}
+    keep = {*STANDARD_GLOBAL, _regional_pick(resort)}
     return [m for m in full if m.id in keep]
 
 
@@ -152,9 +158,10 @@ API_PER_MINUTE = 480                     # free tier allows 600 per minute
 API_PER_HOUR = 4_800                     # ... and 5,000 per hour (a full run is ~4,500)
 STALE_AFTER_H = 28.0                     # a once-a-day product older than this is refreshed out of turn
 # ... and one younger than this is not refreshed again in its slot. A regular daily refresh is
-# ~24 h old when its slot comes round; 18 h keeps a full run (first deploy, lost previous data)
-# from being followed by a second round of regional refreshes on the same day.
-FRESH_WITHIN_H = 18.0
+# ~24 h old when its slot comes round. 12 h keeps a full run (first deploy, lost previous data)
+# from being followed by a second round of refreshes in the next two slots, and still lets a
+# region caught up late (its slot's run was skipped) return to its own slot the next day.
+FRESH_WITHIN_H = 12.0
 
 
 def load_featured(path: Path | str = FEATURED_PATH) -> list[str]:
@@ -177,6 +184,16 @@ def refresh_slot(lon: float) -> int:
     if lon < -100.0:
         return 14
     return 20
+
+
+def last_slot_time(slot_hour: int, now: datetime) -> datetime:
+    """The most recent time (<= now) a resort's daily refresh slot opened.
+
+    GitHub delays scheduled runs by hours and drops some altogether, so a resort is due whenever its
+    document predates the last opening of its slot, whichever run comes first after that.
+    """
+    t = now.replace(hour=slot_hour, minute=0, second=0, microsecond=0)
+    return t if t <= now else t - timedelta(days=1)
 
 
 def current_slot(utc_hour: int) -> int:

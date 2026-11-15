@@ -27,20 +27,25 @@ def test_call_weights_match_the_free_tier_rules():
     assert call_weight(40, 8) == pytest.approx(4.0)
 
 
-def test_standard_tier_gets_three_models_and_one_ensemble():
+def test_standard_tier_gets_the_global_models_plus_one_regional_and_one_ensemble():
+    glob = {"ecmwf_ifs025", "gfs_global", "icon_seamless", "gem_global"}
     us = make_resort()
-    assert {m.id for m in models_for(us, "standard")} == {"ecmwf_ifs025", "gfs_global", "ncep_nbm_conus"}
+    assert {m.id for m in models_for(us, "standard")} == glob | {"ncep_nbm_conus"}
     assert len(models_for(us, "featured")) == 8
     ch = make_resort(country="CH", state=None, timezone="Europe/Zurich")
-    assert {m.id for m in models_for(ch, "standard")} == {"ecmwf_ifs025", "gfs_global", "icon_seamless"}
+    assert {m.id for m in models_for(ch, "standard")} == glob | {"meteofrance_seamless"}
     jp = make_resort(country="JP", state="Nagano", timezone="Asia/Tokyo")
-    assert {m.id for m in models_for(jp, "standard")} == {"ecmwf_ifs025", "gfs_global", "jma_seamless"}
+    assert {m.id for m in models_for(jp, "standard")} == glob | {"jma_seamless"}
     nz = make_resort(country="NZ", state=None, timezone="Pacific/Auckland")
-    assert {m.id for m in models_for(nz, "standard")} == {"ecmwf_ifs025", "gfs_global", "ukmo_seamless"}
+    assert {m.id for m in models_for(nz, "standard")} == glob | {"ukmo_seamless"}
+    ca = make_resort(country="CA", state="BC", timezone="America/Vancouver")
+    assert {m.id for m in models_for(ca, "standard")} == glob | {"gem_hrdps_continental"}
     ak = make_resort(state="AK", timezone="America/Anchorage")
-    for r in (us, ch, jp, nz, ak):
-        assert len(models_for(r, "standard")) == 3
+    assert {m.id for m in models_for(ak, "standard")} == glob                     # no regional model up there
+    for r in (us, ch, jp, nz, ca, ak):
         assert set(models_for(r, "standard")) <= set(models_for(r, "featured"))
+    for r in load_resorts().resorts:
+        assert 4 <= len(models_for(r, "standard")) <= 5, r.id
     assert [e.id for e in ensembles_for("standard")] == ["gfs05"]
     assert [e.id for e in ensembles_for("featured")] == [e.id for e in ENSEMBLES]
 

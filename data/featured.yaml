@@ -1,11 +1,11 @@
 # Featured resorts: refreshed on every run (every 6 hours) with every model that
 # covers them, plus all four ensembles once a day. Everything else in
-# data/resorts.yaml is "standard": once a day, ECMWF IFS + GFS + one regional
-# model, and the GEFS ensemble.
+# data/resorts.yaml is "standard": once a day, ECMWF IFS + GFS + ICON + GEM + one
+# regional model, and the GEFS ensemble.
 #
 # The list is limited by the Open-Meteo free tier (10,000 weighted calls a day;
 # we stay under 8,000). A featured resort in the US costs about 115 calls a day,
-# a standard one about 16. tests/test_budget.py fails if this list no longer fits.
+# a standard one about 22. tests/test_budget.py fails if this list no longer fits.
 featured:
   # California
   - palisades-tahoe

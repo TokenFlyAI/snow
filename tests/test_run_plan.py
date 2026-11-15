@@ -75,6 +75,26 @@ def test_a_full_run_earlier_today_is_not_repeated_in_the_regional_slot():
     assert later["tahoe-standard"].det and later["tahoe-standard"].ens         # the normal daily rhythm
 
 
+def test_a_skipped_slot_is_caught_up_by_the_next_run():
+    # GitHub drops scheduled runs: the 02:37 run (Europe) never came, the next one starts at 09:19
+    rs = _resorts()
+    late = datetime(2026, 1, 10, 9, 19, tzinfo=timezone.utc)
+    prev = {"resorts": [{"id": r.id, "tier": "standard",
+                         "generated_at": (late - timedelta(hours=24)).strftime(FMT),
+                         "ensemble_at": (late - timedelta(hours=24)).strftime(FMT)} for r in rs]}
+    prev["resorts"][1]["generated_at"] = prev["resorts"][1]["ensemble_at"] = "2026-01-09T15:00:00Z"  # Tahoe: yesterday's slot
+    t = _by_id(plan(rs, set(), prev, late))
+    assert t["zermatt"].det and t["zermatt"].ens and t["zermatt"].why == "due"     # slot 02 opened since
+    assert t["vermont"].det and t["vermont"].ens                                    # its own slot (08)
+    assert not t["tahoe-standard"].det                                              # slot 14 has not opened yet
+    # once caught up, the following runs leave it alone until 02:00 UTC tomorrow
+    done = {"resorts": [{**row, "generated_at": late.strftime(FMT), "ensemble_at": late.strftime(FMT)}
+                        for row in prev["resorts"]]}
+    for h in (6, 11, 16):
+        assert not _by_id(plan(rs, set(), done, late + timedelta(hours=h)))["zermatt"].det
+    assert _by_id(plan(rs, set(), done, late + timedelta(hours=17, minutes=30)))["zermatt"].det   # 02:49 next day
+
+
 def test_full_and_featured_modes():
     rs = _resorts()
     prev = {"resorts": [_row(rs[0], "featured", 1, 1)] + [_row(r, "standard", 20, 20) for r in rs[1:]]}

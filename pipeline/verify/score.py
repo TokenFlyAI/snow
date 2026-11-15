@@ -20,7 +20,7 @@ Per lead (days ahead in the resort's time zone when the forecast was issued):
     models                         MAE of each raw model on the same pairs; skill_vs_nbm =
                                    1 - our MAE / NBM's MAE where NBM was in the blend.
 Reliability of the 15 cm probability is kept for "overall" only (10 bins).
-"recent": every observed ski day of the last 30 days with the forecasts made 1 and 3 days ahead.
+"recent": every observed ski day of the last 30 days that has a forecast made 1 or 3 days ahead.
 """
 from __future__ import annotations
 
@@ -215,6 +215,8 @@ def recent_pairs(forecasts: dict[tuple, dict], obs: dict[tuple, dict], start: da
                 fc[str(k)] = {"snow_cm": _mid(f.get("snow_cm")), "low_cm": _mid(f.get("snow_low_cm")),
                               "high_cm": _mid(f.get("snow_high_cm")), "precip_mm": f.get("precip_mm"),
                               "p_15": (f.get("ens") or {}).get("p_15")}
+        if not fc:
+            continue                                   # e.g. days before the archive started
         out.append({"resort_id": rid, "date": day, "station": o.get("station"), "obs_snow_cm": o.get("snow_cm"),
                     "obs_precip_mm": o.get("precip_mm"), "flags": o.get("flags") or [], "forecast": fc})
     return out

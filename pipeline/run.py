@@ -350,8 +350,8 @@ def publish_verification(out_dir: Path, archive_dir: Path, resorts: list[Resort]
     if doc:
         _write(out_dir / "verification.json", doc)
         season = doc["windows"]["season"]
-        log.info("verification: %d resorts, %d ski days scored this season", season["resorts"], season["ski_days"])
-        return {"status": status, "season_ski_days": season["ski_days"], "season_resorts": season["resorts"]}
+        log.info("verification: %d resorts, %d ski days scored this season", season["n_resorts"], season["ski_days"])
+        return {"status": status, "season_ski_days": season["ski_days"], "season_resorts": season["n_resorts"]}
     return {"status": "none"}
 
 

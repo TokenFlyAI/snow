@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useUser } from "@/components/Providers";
 import { useObs } from "@/lib/data";
@@ -61,6 +62,7 @@ export function Measured({ id, hasObs }: { id: string; hasObs: boolean }) {
         {t("measuredSource")} · {t("updated")} {fmtUpdated(data.generated_at, lang)}
         {days.some(fell) && <> · –* {t("measuredDepthFell")}</>}
       </p>
+      <Link href="/accuracy/" className="mt-2 inline-block text-sm text-ink-2 underline decoration-line underline-offset-4">{t("accLink")}</Link>
     </section>
   );
 }

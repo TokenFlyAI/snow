@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { LoadState, Updated } from "@/components/Bits";
 import { useUser } from "@/components/Providers";
 import { useManifest } from "@/lib/data";
@@ -12,7 +13,7 @@ const METHOD = {
     ["集合预报", "ECMWF ENS（51 个成员）、GEFS（31）、加拿大 GEPS（21）、ICON-EPS（40）。每个成员都是把初始状态稍作扰动后重跑一遍的预报，成员之间的差别就是不确定性。成员的降雪先按当天的雪水比换算，再乘一个订正系数，使未来 10 天的集合平均总量与多模型融合一致（全球集合分辨率低，山区降水系统性偏少）。"],
     ["范围与信心", "逐日图上的灰色带是集合成员的 10%–90% 范围。信心 = 落在预报值 ±50%（至少 ±5 cm）以内的成员比例：一半以上为高，四分之一以上为中，否则为低；7 天以上最高为中。"],
     ["第 11 天以后", "不再给单日数值，只给概率：例如「≥15 cm 的概率 30%」表示 30% 的成员在那一天达到 15 cm。第 3–5 周只给周累计降雪的概率，来自 35 天的 GEFS 和 GEPS，只能当趋势看。"],
-    ["更新频率", "重点雪场每 6 小时用全部模型更新；其余雪场每天在当地清晨前更新一次，用 ECMWF、GFS 和一个区域模型，集合只用 GEFS。这是免费数据额度（每天 10,000 次）决定的。"],
+    ["更新频率", "重点雪场每 6 小时用全部模型更新；其余雪场每天在当地清晨前更新一次，用 ECMWF、GFS、ICON、GEM 和一个区域模型，集合只用 GEFS。ECMWF 用 9 公里的原生格点。这是免费数据额度（每天 10,000 次）决定的。"],
   ],
   en: [
     ["Elevation correction", "Model terrain is smoothed, so the grid cell is rarely at resort height. Temperatures are moved to base, mid and summit with the lapse rate the model itself has in that layer (kept within 3–9.8 °C/km)."],
@@ -22,7 +23,7 @@ const METHOD = {
     ["Ensembles", "ECMWF ENS (51 members), GEFS (31), Canadian GEPS (21), ICON-EPS (40). Each member is the forecast re-run from a slightly perturbed start, so the differences between members are the uncertainty. Member snowfall is converted with the day's snow ratio and multiplied by one factor that makes the ensemble-mean total of the next 10 days match the blend (global ensembles are coarse and systematically dry in the mountains)."],
     ["Range and confidence", "The grey band on the daily chart is the 10–90 % range of the members. Confidence is the share of members within ±50 % (at least ±5 cm) of the forecast value: high from one half, medium from one quarter, otherwise low; at most medium beyond 7 days."],
     ["Beyond day 10", "No single-day amounts, only probabilities: “30 % chance of ≥ 15 cm” means 30 % of the members reach 15 cm that day. Weeks 3–5 give the chance of a weekly total from the 35-day GEFS and GEPS runs; treat it as a trend."],
-    ["Update frequency", "Featured resorts are refreshed every 6 hours with every model. All others once a day before the local morning with ECMWF, GFS and one regional model, and GEFS as the only ensemble. The free data quota (10,000 calls a day) sets this limit."],
+    ["Update frequency", "Featured resorts are refreshed every 6 hours with every model. All others once a day before the local morning with ECMWF, GFS, ICON, GEM and one regional model, and GEFS as the only ensemble. ECMWF is used at its native 9 km grid. The free data quota (10,000 calls a day) sets this limit."],
   ],
 };
 
@@ -39,6 +40,7 @@ export default function About() {
             <div key={k}><dt className="text-sm font-medium">{k}</dt><dd className="mt-0.5 text-sm leading-6 text-ink-2">{v}</dd></div>
           ))}
         </dl>
+        <Link href="/accuracy/" className="mt-4 inline-block text-sm text-ink-2 underline decoration-line underline-offset-4">{t("accLink")}</Link>
       </section>
 
       <LoadState loading={loading} error={error} />

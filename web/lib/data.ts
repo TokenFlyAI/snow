@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { PlannerDoc } from "./planner";
-import type { Manifest, ObsDoc, ResortDoc, ResortIndex, TrendDoc } from "./types";
+import type { Manifest, ObsDoc, ResortDoc, ResortIndex, TrendDoc, VerificationDoc } from "./types";
 
 export const DATA_BASE = (process.env.NEXT_PUBLIC_DATA_BASE ?? "https://tokenflyai.github.io/snow/data/v1").replace(/\/$/, "");
 
@@ -48,3 +48,4 @@ export function trendChange(trend: TrendDoc | null, day: string, asOf: string | 
   if (prev < 0 || vals[cur] == null || vals[prev] == null) return null;
   return (vals[cur] as number) - (vals[prev] as number);
 }
+export const useVerification = () => useJson<VerificationDoc>("verification.json");

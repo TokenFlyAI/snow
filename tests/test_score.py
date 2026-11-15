@@ -114,5 +114,14 @@ def test_windows(scored):
     assert season["start"] == "2026-09-01"
     assert w30["overall"]["leads"]["1"]["snow_n"] == 1              # 2 Nov is outside the last 30 days
     assert season["overall"]["leads"]["1"]["snow_n"] == 2
-    assert scored["windows"]["season"]["ski_days"] == 3
+    assert scored["windows"]["season"]["ski_days"] == 3 and scored["windows"]["season"]["n_resorts"] == 2
+    assert set(scored["windows"]["season"]["resorts"]) == {"a", "b"}
     assert "10" not in season["overall"]["leads"]                   # 21 Dec has not been observed yet
+
+
+def test_recent_pairs(scored):
+    rec = {(r["resort_id"], r["date"]): r for r in scored["recent"]}
+    assert set(rec) == {("a", "2026-12-10"), ("a", "2026-12-11"), ("b", "2026-12-10")}     # 2 Nov is older than 30 days
+    a = rec[("a", "2026-12-10")]
+    assert a["obs_snow_cm"] == 16 and a["forecast"]["1"]["snow_cm"] == 20 and a["forecast"]["1"]["high_cm"] == 30
+    assert "3" not in a["forecast"] and rec[("b", "2026-12-10")]["flags"] == ["depth_fell"]

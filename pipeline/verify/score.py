@@ -20,6 +20,7 @@ Per lead (days ahead in the resort's time zone when the forecast was issued):
     models                         MAE of each raw model on the same pairs; skill_vs_nbm =
                                    1 - our MAE / NBM's MAE where NBM was in the blend.
 Reliability of the 15 cm probability is kept for "overall" only (10 bins).
+"recent": every observed ski day of the last 30 days with the forecasts made 1 and 3 days ahead.
 """
 from __future__ import annotations
 
@@ -191,11 +192,32 @@ def score(forecasts: dict[tuple, dict], obs: dict[tuple, dict], region_of: dict[
     for kind, gid, _ in groups:
         ids[kind].add(gid)
     return {
-        "start": start.isoformat(), "end": end.isoformat(), "ski_days": len(days), "resorts": len(resorts),
+        "start": start.isoformat(), "end": end.isoformat(), "ski_days": len(days), "n_resorts": len(resorts),
         "overall": {"leads": leads("overall", ""), "reliability_15": _reliability(rel)},
         "regions": {g: {"leads": leads("regions", g)} for g in sorted(ids["regions"])},
         "resorts": {g: {"leads": leads("resorts", g)} for g in sorted(ids["resorts"])},
     }
+
+
+RECENT_LEADS = (1, 3)
+
+
+def recent_pairs(forecasts: dict[tuple, dict], obs: dict[tuple, dict], start: date, end: date) -> list[dict]:
+    """Forecast vs observed per resort and ski day (for the page's day-by-day table)."""
+    out = []
+    for (rid, day), o in sorted(obs.items()):
+        if not (start.isoformat() <= day <= end.isoformat()):
+            continue
+        fc = {}
+        for k in RECENT_LEADS:
+            f = forecasts.get((rid, day, k))
+            if f and f.get("kind") == "point":
+                fc[str(k)] = {"snow_cm": _mid(f.get("snow_cm")), "low_cm": _mid(f.get("snow_low_cm")),
+                              "high_cm": _mid(f.get("snow_high_cm")), "precip_mm": f.get("precip_mm"),
+                              "p_15": (f.get("ens") or {}).get("p_15")}
+        out.append({"resort_id": rid, "date": day, "station": o.get("station"), "obs_snow_cm": o.get("snow_cm"),
+                    "obs_precip_mm": o.get("precip_mm"), "flags": o.get("flags") or [], "forecast": fc})
+    return out
 
 
 def build_verification(root: Path | str, region_of: dict[str, str], now: datetime) -> dict:
@@ -208,6 +230,7 @@ def build_verification(root: Path | str, region_of: dict[str, str], now: datetim
     with_obs = {rid for rid, _ in obs} & want
     fc = latest_forecasts(r for r in read_rows(root, with_obs, s_start - timedelta(days=16), end)
                           if s_start.isoformat() <= r["target_date"] <= end.isoformat())
+    w30 = max(s_start, end - timedelta(days=29))
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -218,7 +241,8 @@ def build_verification(root: Path | str, region_of: dict[str, str], now: datetim
         "notes": "Observed new snow is a lower bound (settling), gauge precipitation under-catches in wind. "
                  "Definitions: pipeline/verify/score.py.",
         "windows": {
-            "30d": score(fc, obs, region_of, max(s_start, end - timedelta(days=29)), end),
+            "30d": score(fc, obs, region_of, w30, end),
             "season": score(fc, obs, region_of, s_start, end),
         },
+        "recent": recent_pairs(fc, obs, w30, end),
     }

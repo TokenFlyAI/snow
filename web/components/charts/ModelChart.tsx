@@ -8,7 +8,7 @@ import { axisStyle, baseOption, EChart, type Palette } from "./EChart";
 
 /** Fixed colour slot per model so a colour always means the same model. */
 const SLOT: Record<string, number> = {
-  ecmwf_ifs025: 0, gfs_global: 1, ncep_nbm_conus: 2, icon_seamless: 3,
+  ecmwf_ifs: 0, ecmwf_ifs025: 0, gfs_global: 1, ncep_nbm_conus: 2, icon_seamless: 3,   // ecmwf_ifs025: documents before 2026-11-15
   ecmwf_aifs025_single: 4, gem_global: 5, ncep_hrrr_conus: 6, gem_hrdps_continental: 6, jma_seamless: 6, ncep_rrfs_conus: 7,
   // regions never overlap, so regional models can share slots: NBM's slot is free outside the US
   ukmo_seamless: 2, meteofrance_seamless: 6, meteoswiss_icon_seamless: 7, cma_grapes_global: 7,

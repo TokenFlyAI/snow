@@ -132,3 +132,31 @@ export interface Manifest {
 
 /** trend/{id}.json: mid-mountain snow of each ski day in the last issues (pipeline/publish/trend.py). */
 export interface TrendDoc { schema_version: number; resort_id: string; generated_at: string; issues: string[]; days: Record<string, (number | null)[]> }
+
+/** verification.json (pipeline/verify/score.py). */
+export interface LeadScores {
+  n: number; snow_n?: number; snow_mae_cm?: number; snow_bias_cm?: number;
+  precip_n?: number; precip_mae_mm?: number; precip_bias_mm?: number;
+  big?: { hits: number; misses: number; false_alarms: number; csi: number | null };
+  brier_15?: number; brier_2_5?: number;
+  coverage?: { range?: number; ensemble_10_90?: number };
+  models?: Record<string, { n: number; snow_mae_cm: number; ours_snow_mae_cm: number }>;
+  skill_vs_nbm?: number;
+}
+export interface VerificationGroup {
+  leads: Record<string, LeadScores>;
+  reliability_15?: { bin: string; n: number; forecast: number; observed: number }[];
+}
+export interface VerificationWindow {
+  start: string; end: string; ski_days: number; n_resorts: number;
+  overall: VerificationGroup; regions: Record<string, VerificationGroup>; resorts: Record<string, VerificationGroup>;
+}
+export interface RecentPair {
+  resort_id: string; date: string; station: string | null; obs_snow_cm: number | null; obs_precip_mm: number | null;
+  flags: string[];
+  forecast: Record<string, { snow_cm: number | null; low_cm: number | null; high_cm: number | null; precip_mm: number | null; p_15: number | null }>;
+}
+export interface VerificationDoc {
+  schema_version: number; generated_at: string; method: string; leads: number[];
+  windows: { "30d": VerificationWindow; season: VerificationWindow }; recent: RecentPair[];
+}

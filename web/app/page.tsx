@@ -64,7 +64,10 @@ export default function Home() {
                 );
               })}
             </ol>
-            <Link href="/rank/" className="mt-3 inline-block text-sm text-ink-2 underline decoration-line underline-offset-4">{t("seeAll")} →</Link>
+            <div className="mt-3 flex flex-wrap justify-between gap-2">
+              <Link href="/rank/" className="text-sm text-ink-2 underline decoration-line underline-offset-4">{t("seeAll")} →</Link>
+              <Link href="/accuracy/" className="text-sm text-ink-2 underline decoration-line underline-offset-4">{t("accLink")}</Link>
+            </div>
           </section>
         </>
       )}

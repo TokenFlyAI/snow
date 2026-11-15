@@ -5,6 +5,7 @@ import { DailyChart } from "@/components/charts/DailyChart";
 import { HourlyCharts } from "@/components/charts/HourlyCharts";
 import { ModelChart } from "@/components/charts/ModelChart";
 import { OutlookWeeks, ProbDays } from "@/components/Outlook";
+import { Measured } from "@/components/Measured";
 import { useUser } from "@/components/Providers";
 import { useResort } from "@/lib/data";
 import { fmtDate, fmtProb, fmtUpdated } from "@/lib/i18n";
@@ -148,6 +149,8 @@ export default function ResortClient({ id }: { id: string }) {
               </p>
             )}
           </Section>
+
+          <Measured id={id} hasObs={!!meta.has_obs} />
 
           {data.outlook.length > 0 && (
             <Section title={`${t("outlook")} · ${t("mid")}`} hint={t("outlookHint")}>

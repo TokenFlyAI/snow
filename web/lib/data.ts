@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { PlannerDoc } from "./planner";
-import type { Manifest, ResortDoc, ResortIndex } from "./types";
+import type { Manifest, ObsDoc, ResortDoc, ResortIndex } from "./types";
 
 export const DATA_BASE = (process.env.NEXT_PUBLIC_DATA_BASE ?? "https://tokenflyai.github.io/snow/data/v1").replace(/\/$/, "");
 
@@ -31,3 +31,5 @@ export const useIndex = () => useJson<ResortIndex>("resorts.json");
 export const useResort = (id: string) => useJson<ResortDoc>(`resort/${id}.json`);
 export const useManifest = () => useJson<Manifest>("manifest.json");
 export const usePlanner = () => useJson<PlannerDoc>("planner.json");
+/** null: the resort has no measuring station, nothing is fetched. */
+export const useObs = (id: string | null) => useJson<ObsDoc>(id ? `obs/${id}.json` : null);

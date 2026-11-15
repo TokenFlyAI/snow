@@ -34,15 +34,18 @@ from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
 from .publish.build import build_index, build_manifest, build_resort, split_daily
+from .publish.obs_docs import build_obs_docs
 from .publish.planner import build_planner
 from .resorts import Resort, load_resorts
 from .state import DEFAULT_PREVIOUS, Previous, age_hours, parse_time
 from .verify import archive
+from .verify.obs import load_stations
 
 log = logging.getLogger("pipeline")
 MIN_MODELS_OK = 2
 MIN_RESORT_SHARE = 0.9          # publish only if at least this share of the resorts has a document
 ENS_DAYS = 7 * max(OUTLOOK_WEEKS)
+STATIONS_FILE = Path(__file__).resolve().parents[1] / "data" / "stations.yaml"
 
 
 def _write(path: Path, doc: dict) -> None:
@@ -100,7 +103,8 @@ def plan(resorts: list[Resort], featured: set[str], prev_index: Optional[dict], 
 
 def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None = None,
         mode: str = "auto", previous: Optional[str] = DEFAULT_PREVIOUS, featured_path: str | None = None,
-        now: Optional[datetime] = None, archive_dir: Optional[Path] = None) -> int:
+        now: Optional[datetime] = None, archive_dir: Optional[Path] = None,
+        stations_path: Optional[str] = None) -> int:
     db = load_resorts(resorts_path) if resorts_path else load_resorts()
     featured = set(load_featured(featured_path) if featured_path else load_featured())
     unknown = featured - {r.id for r in db.resorts}
@@ -241,6 +245,8 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
             log.info("archived %d issued forecasts -> %s", len(issued), path)
         except Exception as e:  # noqa: BLE001  the archive must never stop a publish
             log.warning("forecast archive not written: %s", e)
+    if stations_path:
+        run_info["obs"] = publish_obs(out_dir, resorts, load_stations(stations_path), now, prev)
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
     _write(out_dir / "planner.json", build_planner(db.regions, docs, now))
     # manifest is written last: its presence marks a complete run
@@ -250,6 +256,25 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
              usage.get("weighted_calls", 0.0), {k: round(v) for k, v in usage.get("by_kind", {}).items()},
              budget["total"], 10000, out_dir)
     return 0
+
+
+def publish_obs(out_dir: Path, resorts: list[Resort], stations: dict[str, list[dict]], now: datetime,
+                prev: Previous, fetch=None) -> dict:
+    """obs/{id}.json for resorts with stations; on failure the previous files are kept. Never fails the run."""
+    wanted = [r for r in resorts if stations.get(r.id)]
+    try:
+        docs = build_obs_docs(wanted, stations, now, fetch)
+        status = "ok"
+    except Exception as e:  # noqa: BLE001  observations are an extra: never stop a publish
+        log.warning("observations not refreshed (%s): keeping the previous files", e)
+        docs, status = {}, "previous"
+    missing = [r.id for r in wanted if r.id not in docs]
+    for rid, d in prev.get_many(f"obs/{rid}.json" for rid in missing).items():
+        if d:
+            docs[d["resort_id"]] = d
+    for rid, d in docs.items():
+        _write(out_dir / "obs" / f"{rid}.json", d)
+    return {"status": status, "resorts": len(docs), "resorts_with_stations": len(wanted)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -265,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="URL or directory of the last published data set, or 'none'")
     ap.add_argument("--archive", default=os.environ.get("SNOW_ARCHIVE") or None,
                     help="also write this run's issued forecasts to DIR/forecasts/... (see pipeline/verify/archive.py)")
+    ap.add_argument("--stations", default=os.environ.get("SNOW_STATIONS", str(STATIONS_FILE)),
+                    help="station list for observations (data/stations.yaml), or 'none'")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -273,7 +300,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     only = [s.strip() for s in args.resorts.split(",") if s.strip()] or None
     return run(Path(args.out), only, args.resorts_file, args.mode, args.previous, args.featured_file,
-               archive_dir=Path(args.archive) if args.archive else None)
+               archive_dir=Path(args.archive) if args.archive else None,
+               stations_path=None if args.stations == "none" else args.stations)
 
 
 if __name__ == "__main__":

@@ -13,8 +13,21 @@ export interface ResortMeta {
   passes: Partial<Record<"ikon" | "epic", PassTier>>;
   country: string; state: string | null; region: string;
   lat: number; lon: number; elevation_m: ByLevel<number>; timezone: string;
-  needs_review: boolean; tier?: Tier;
+  needs_review: boolean; tier?: Tier; has_obs?: boolean;
 }
+
+/** obs/{id}.json: ski days measured at the nearby stations (pipeline/publish/obs_docs.py). */
+export interface ObsDay {
+  date: string; complete: boolean;
+  precip_mm: number | null; precip_night_mm: number | null; swe_gain_mm: number | null;
+  snow_cm: number | null; snow_night_cm: number | null; depth_cm: number | null;
+  temp_min_c: number | null; temp_max_c: number | null; flags: string[];
+}
+export interface ObsStation {
+  triplet: string; name: string; lat: number; lon: number; elevation_m: number; km: number; dz_m: number;
+  grade: "A" | "B" | "C"; days: ObsDay[];
+}
+export interface ObsDoc { schema_version: number; resort_id: string; generated_at: string; source: string; timezone: string; stations: ObsStation[] }
 
 /** Ski-day total (today's ski day started at 16:00 yesterday) with the ensemble 10-90 % range. */
 export interface WindowTotal { cm: ByLevel; low_cm: ByLevel | null; high_cm: ByLevel | null; days: number; complete: boolean }

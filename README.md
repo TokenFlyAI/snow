@@ -56,6 +56,13 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 | `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）；逐日：前 10 天点值（夜间 / 白天降雪、集合 10–90% 范围、信心、雪质），第 11–16 天只有集合分位数和概率；第 3–5 周展望；各模型逐日降雪 |
 | `ens/{id}.json` | 集合各成员的滑雪日降雪（未订正的原始值），供下一次运行复用，前端不读 |
 | `planner.json` | "去哪滑"页用的紧凑数据：每个雪场每个滑雪日的粉雪分、开门时新雪、全天降雪和范围、≥2.5 / 15 cm 概率、雪质、阵风、雨（约 280 KB，压缩后约 45 KB）。字段和粉雪分的定义见 `pipeline/publish/planner.py` |
+| `obs/{id}.json` | 有 SNOTEL 站的雪场（美国西部 34 个）：附近 1–3 个站最近 14 个滑雪日的实测（夜间 / 全天新雪、降水、雪深、气温、质量标记）。见下面"实测" |
+
+### 实测（SNOTEL）
+
+`data/stations.yaml` 由 `scripts/match_stations.py` 生成：每个美国雪场 15 公里内的 SNOTEL 站，按和山腰的高差排序，最多 3 个，分级 A（5 公里内、高差 300 米内）/ B（15 公里内、高差 500 米内）/ C（只展示）。现在 34 个美国西部雪场有 A 或 B 级站；Mammoth、June、阿斯彭四个、Snowbasin、Mt. Bachelor 和南加州三个没有，要等加州 CDEC 等其他来源。
+
+每次运行用 NRCS AWDB 接口（公有领域，免密钥，不占 Open-Meteo 额度）拉这些站最近两周的**逐小时**读数，按和预报相同的滑雪日窗口汇总（`pipeline/verify/obs.py`）：降水用雨量计（7 小时中位数滤波后取单调上升，大风中少测）；新雪用雪深的正增量（5 小时中位数滤波 + 2 英寸死区，只在雨量计有 ≥ 3 mm 时计入），是下限；下雪时雪深反降的日子标 `depth_fell`，评分不用。SNOTEL 的逐小时时间是站点的固定时区（本土 UTC−8、阿拉斯加 UTC−9，不随夏令时变）。拉取失败时保留上一版文件，不影响发布。详情页在逐日预报下面显示"附近实测"。
 
 ### 预报存档
 
@@ -109,6 +116,8 @@ python -m pipeline.run --out site/data/v1 --mode full --previous none   # 全部
 python -m pipeline.run --resorts alta,vail --mode full --previous none  # 只跑部分雪场
 python -m pipeline.run --out site/data/v1        # 按计划：只刷新到期的雪场，其余从线上上一版带过
 python -m pipeline.run --out site/data/v1 --archive archive   # 同时把本次发布的预报写进 archive/forecasts/
+python -m pipeline.run --out site/data/v1 --stations none     # 不拉 SNOTEL 实测（默认读 data/stations.yaml）
+python scripts/match_stations.py                 # 重新给雪场配 SNOTEL 站，写 data/stations.yaml
 
 # 前端（Node 20+）
 cd web && npm install
@@ -143,7 +152,7 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 
 - [Open-Meteo](https://open-meteo.com/)（CC BY 4.0）：ECMWF IFS / AIFS、NOAA GFS / NBM / HRRR / RRFS、DWD ICON、加拿大 GEM / HRDPS、JMA、Météo-France AROME / ARPEGE、MeteoSwiss ICON-CH、英国气象局全球模型、CMA GRAPES；集合预报 ECMWF ENS、GEFS、GEPS、ICON-EPS。免费档仅限非商用：600 次/分钟、5,000 次/小时、10,000 次/天；超过 10 个变量或 14 天按比例多计，集合的每个成员算一个变量。
 - 底图：[OpenFreeMap](https://openfreemap.org/)（免密钥），© OpenStreetMap 贡献者。
-- 回测观测：[USDA NRCS SNOTEL](https://www.nrcs.usda.gov/wps/portal/wcc/home/)（公有领域）。
+- 实测与回测：[USDA NRCS SNOTEL](https://www.nrcs.usda.gov/wps/portal/wcc/home/)，AWDB REST API（公有领域）。
 - 雪场坐标与索道：© OpenStreetMap 贡献者（ODbL），经 Overpass API；海拔：维基百科与雪场官网，用 Mapzen 地形数据（经 Open Topo Data）核对。
 - 雪场名单：ikonpass.com 与 epicpass.com 的 2026-27 通行证页面（2026-11-11 核对）。
 
@@ -168,7 +177,8 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
    - ✅ standard 档加 ICON、GEM；跳过的定时运行由下一次补上
    - ✅ 预报存档（`archive` 分支）
    - ✅ `planner.json` + 粉雪分；"去哪滑"页（未来 5 天排雪场，更远只排日子和地区；可分享链接）
-   - SNOTEL 实测接入 → 评分 → 范围和概率校准 → 9 公里 ECMWF → 总量偏差订正 → 准确率页面
+   - ✅ SNOTEL 实测接入（美国西部 34 个雪场，详情页"附近实测"）
+   - 评分 → 范围和概率校准 → 9 公里 ECMWF → 总量偏差订正 → 准确率页面
    - 通行证分产品与限制日期、路网车程表、日历订阅提醒
 4. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
 5. 登录与跨设备同步（Supabase）、邮件粉雪警报、月 / 季展望、数据迁移到 Cloudflare R2

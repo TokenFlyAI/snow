@@ -27,8 +27,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from .config import (DAILY_DAYS, ENSEMBLES, FRESH_WITHIN_H, MODELS, OUTLOOK_WEEKS, STALE_AFTER_H, current_slot,
-                     ensembles_for, estimate_daily_calls, last_slot_time, load_featured, models_for, refresh_slot)
+from .config import (API_PER_HOUR, DAILY_DAYS, ENSEMBLES, FORECAST_DAYS, FRESH_WITHIN_H, MODELS, OUTLOOK_WEEKS,
+                     PAST_DAYS, STALE_AFTER_H, call_weight, current_slot, ensembles_for, estimate_daily_calls,
+                     last_slot_time, load_featured, models_for, refresh_slot)
 from .ingest.open_meteo import ModelData, OpenMeteoError, fetch_model, hourly_vars, make_client
 from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
@@ -45,6 +46,10 @@ from .verify.score import build_verification
 log = logging.getLogger("pipeline")
 MIN_MODELS_OK = 2
 MIN_RESORT_SHARE = 0.9          # publish only if at least this share of the resorts has a document
+# One run must fit the hourly API limit: above it the rate limiter waits for the hour to roll over
+# and the job times out. After skipped or failed runs every standard resort is due at once
+# (5,700 weighted calls with 5 models), so the least overdue ones wait for the next run.
+RUN_BUDGET = 0.95 * API_PER_HOUR
 ENS_DAYS = 7 * max(OUTLOOK_WEEKS)
 STATIONS_FILE = Path(__file__).resolve().parents[1] / "data" / "stations.yaml"
 
@@ -102,6 +107,36 @@ def plan(resorts: list[Resort], featured: set[str], prev_index: Optional[dict], 
     return tasks
 
 
+def task_weight(t: Task) -> float:
+    """Weighted Open-Meteo calls this task adds to the run (requests are batched, weight is per location)."""
+    w = 0.0
+    if t.det:
+        w += len(models_for(t.resort, t.tier)) * call_weight(len(hourly_vars()), FORECAST_DAYS + PAST_DAYS)
+    if t.ens:
+        w += sum(call_weight(e.members, e.days) for e in ensembles_for(t.tier))
+    return w
+
+
+def cap_to_budget(tasks: list[Task], prev_index: Optional[dict], budget: float) -> int:
+    """Defer the least overdue refreshes beyond the budget to the next run. Featured resorts go
+    first, then the oldest documents; a resort without a previous document is never deferred.
+    Returns the number of deferred resorts."""
+    made = {r["id"]: r.get("generated_at") or "" for r in (prev_index or {}).get("resorts", [])}
+    todo = sorted((t for t in tasks if t.det or t.ens),
+                  key=lambda t: (t.tier != "featured", made.get(t.resort.id, "")))
+    used, n = 0.0, 0
+    for t in todo:
+        w = task_weight(t)
+        if used + w <= budget or t.tier == "featured" or not made.get(t.resort.id):
+            used += w
+            continue
+        t.det, t.ens, t.why = False, False, "deferred (run budget)"
+        n += 1
+    if n:
+        log.warning("run budget %.0f weighted calls: %d refreshes deferred to the next run", budget, n)
+    return n
+
+
 def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None = None,
         mode: str = "auto", previous: Optional[str] = DEFAULT_PREVIOUS, featured_path: str | None = None,
         now: Optional[datetime] = None, archive_dir: Optional[Path] = None,
@@ -120,6 +155,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
     prev = Previous(previous)
     prev_index = prev.get("resorts.json")
     tasks = plan(resorts, featured, prev_index, now, mode)
+    n_deferred = cap_to_budget(tasks, prev_index, RUN_BUDGET) if mode == "auto" else 0
 
     # ---- previously published files for everything that is not refreshed ----------------
     carried = prev.get_many(f"resort/{t.resort.id}.json" for t in tasks if not t.det)
@@ -238,7 +274,7 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         "mode": mode, "slot_utc": current_slot(now.hour),
         "resorts": len(tasks), "featured": sum(t.tier == "featured" for t in tasks),
         "refreshed_deterministic": len(det_tasks), "refreshed_ensemble": len(ens_tasks),
-        "carried_over": n_carried, "failed": failed,
+        "carried_over": n_carried, "failed": failed, "deferred": n_deferred,
     }
     if archive_dir is not None:
         try:

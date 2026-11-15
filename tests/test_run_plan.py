@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from pipeline.run import plan
+from pipeline.run import cap_to_budget, plan, task_weight
 from pipeline.state import Previous, age_hours
 from tests.helpers import make_resort
 
@@ -93,6 +93,24 @@ def test_a_skipped_slot_is_caught_up_by_the_next_run():
     for h in (6, 11, 16):
         assert not _by_id(plan(rs, set(), done, late + timedelta(hours=h)))["zermatt"].det
     assert _by_id(plan(rs, set(), done, late + timedelta(hours=17, minutes=30)))["zermatt"].det   # 02:49 next day
+
+
+def test_a_run_over_the_hourly_budget_defers_the_least_overdue_resorts():
+    rs = _resorts() + [make_resort(id="new-resort")]
+    # after failed runs everything is due; zermatt's document is the oldest
+    prev = {"resorts": [_row(rs[0], "featured", 30, 30), _row(rs[1], "standard", 20, 20),
+                        _row(rs[2], "standard", 26, 26), _row(rs[3], "standard", 40, 40)]}
+    tasks = plan(rs, {"tahoe-featured"}, prev, NOW)
+    assert all(t.det for t in tasks)
+    t = _by_id(tasks)
+    budget = sum(task_weight(t[k]) for k in ("tahoe-featured", "new-resort", "zermatt")) + 1
+    assert cap_to_budget(tasks, prev, budget) == 2
+    assert t["tahoe-featured"].det and t["zermatt"].det                # featured first, then the oldest
+    assert t["new-resort"].det                                         # nothing to carry over: never deferred
+    assert not t["vermont"].det and not t["tahoe-standard"].det
+    assert t["vermont"].why == "deferred (run budget)"
+    # the next run catches them up
+    assert cap_to_budget(plan(rs, {"tahoe-featured"}, prev, NOW), prev, 1e9) == 0
 
 
 def test_full_and_featured_modes():

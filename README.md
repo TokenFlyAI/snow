@@ -8,7 +8,7 @@
 - 由 GitHub Actions 每 6 小时自动运行：重点雪场每次全量更新，其余每天一次，总量控制在免费额度内。
 - 数据全部来自免费开放的来源（见[数据来源](#数据来源与署名)）。
 
-当前是**第二阶段**：集合预报 + 概率、全部雪场、分档更新、地图和排行榜。第二阶段的设计与交接说明在 [`docs/phase2-handoff.md`](docs/phase2-handoff.md)。后续阶段见[路线图](#路线图)。
+第二阶段（集合预报 + 概率、全部雪场、分档更新、地图和排行榜）已完成，设计与交接说明在 [`docs/phase2-handoff.md`](docs/phase2-handoff.md)。现在是**第三阶段**：把预报做准并能验证（预报存档、实测、评分），以及"去哪滑"决策页。进度见[路线图](#路线图)。
 
 ## 架构
 
@@ -39,11 +39,12 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 | 档 | 雪场 | 确定性模型 | 集合预报 | 每点每天约 |
 |---|---|---|---|---|
 | featured | `data/featured.yaml`（28 个） | 每 6 小时，所有覆盖它的模型（最多 8 个） | 每天一次：ECMWF ENS、GEFS、GEPS、ICON-EPS | 115 次 |
-| standard | 其余 201 个 | 每天一次：ECMWF IFS + GFS + 一个区域模型 | 每天一次：GEFS | 16 次 |
+| standard | 其余 201 个 | 每天一次：ECMWF IFS + GFS + ICON + GEM + 一个区域模型 | 每天一次：GEFS | 22 次 |
 
-- 每天一次的刷新落在当地早晨之前：欧洲 02:37 UTC，北美东部和南美 08:37，北美西部 14:37，亚洲和大洋洲 20:37。
+- 每天一次的刷新落在当地早晨之前：欧洲 02:37 UTC，北美东部和南美 08:37，北美西部 14:37，亚洲和大洋洲 20:37。GitHub 的定时任务经常晚几个小时或整次跳过，所以规则是"文档早于该地区时段最近一次开始的时间就刷新"：哪次运行先到就由哪次补上，一天仍只刷新一次（`config.last_slot_time`）。
+- standard 档的模型数是按回测定的：只有 ECMWF + GFS 的融合误差比 5 个模型高 8%–16%。
 - 每次运行先读上一版已发布的数据（`--previous`，默认是线上 GitHub Pages），不到期的雪场原样带过，所以每次发布的都是完整的一套。集合成员的日总量缓存在 `ens/{id}.json`。
-- 按计划估算每天约 6,500 次；`tests/test_budget.py` 在估算超过 8,000 时失败。每次运行的实际用量记在 `manifest.json` 的 `api_usage`，限速器保证每分钟 ≤ 480、每小时 ≤ 4,800。
+- 按计划估算每天约 7,630 次；`tests/test_budget.py` 在估算超过 8,000 时失败。每次运行的实际用量记在 `manifest.json` 的 `api_usage`，限速器保证每分钟 ≤ 480、每小时 ≤ 4,800。
 - 一次全量运行（`--mode full`，或线上数据丢失后的第一次运行）约 4,500 次。
 
 ### 发布的数据（`data/v1/`）
@@ -54,6 +55,11 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 | `resorts.json` | 所有雪场的元数据、分档 + 24h / 72h / 7 天降雪、3 / 7 / 16 天滑雪日累计和集合范围、第 3–5 周展望（首页、地图、排行用） |
 | `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）；逐日：前 10 天点值（夜间 / 白天降雪、集合 10–90% 范围、信心、雪质），第 11–16 天只有集合分位数和概率；第 3–5 周展望；各模型逐日降雪 |
 | `ens/{id}.json` | 集合各成员的滑雪日降雪（未订正的原始值），供下一次运行复用，前端不读 |
+| `planner.json` | "去哪滑"页用的紧凑数据：每个雪场每个滑雪日的粉雪分、开门时新雪、全天降雪和范围、≥2.5 / 15 cm 概率、雪质、阵风、雨（约 280 KB，压缩后约 45 KB）。字段和粉雪分的定义见 `pipeline/publish/planner.py` |
+
+### 预报存档
+
+每次运行把**本次重新计算的**雪场预报逐日写成一行，存到本仓库的孤立分支 [`archive`](https://github.com/TokenFlyAI/snow/tree/archive)：`forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz`（约 240 KB/天）。用来以后对照实测评分、校准范围和概率；线上算法以 `method: "v2"` 冻结为基线。行格式和读取函数在 `pipeline/verify/archive.py`，推送由 `scripts/push_archive.sh` 完成；存档失败不影响发布。
 
 数据格式版本是 `schema_version: 2`（字段说明见 `docs/phase2-handoff.md` §2.6 和 `web/lib/types.ts`）。
 
@@ -102,6 +108,7 @@ python -m pytest -q                              # 单元测试 + 回测 + 预�
 python -m pipeline.run --out site/data/v1 --mode full --previous none   # 全部雪场全量（约 10 分钟，约 4,500 次加权调用）
 python -m pipeline.run --resorts alta,vail --mode full --previous none  # 只跑部分雪场
 python -m pipeline.run --out site/data/v1        # 按计划：只刷新到期的雪场，其余从线上上一版带过
+python -m pipeline.run --out site/data/v1 --archive archive   # 同时把本次发布的预报写进 archive/forecasts/
 
 # 前端（Node 20+）
 cd web && npm install
@@ -148,6 +155,8 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 - 雪水比的风修正、融合权重都是经验值，第 4 阶段的验证系统会按雪场用实测替换。
 - 集合预报只有山腰一个海拔；山脚 / 山顶的分位数按融合里的海拔比例缩放。订正系数是"让集合平均等于融合"，不是用实测校准的，第 4 阶段验证后再改。
 - standard 档的雪场一天只更新一次，集合只有 GEFS（31 个成员），范围比 featured 雪场粗。
+- 回测（美国西部 29 个 SNOTEL 站、两个雪季）：模型间范围只覆盖 34%–48% 的实际降水，集合范围的覆盖率还没测（要等预报存档积累）；雪水比用 SNOTEL 验证不了，是降雪英寸数最大的误差来源。
+- "去哪滑"页的概率是集合预报自己的，还没用实测校准；粉雪分的系数是初始值。
 - 46 个雪场标了 `needs_review`（坐标或海拔来源不一致、靠猜），清单见 `docs/phase2-handoff.md` §5。
 - Open-Meteo 文档显示 HRRR、ICON Global 等标有停用日期（未能二次确认）；模型缺数据时会被自动剔除并在页面标注。
 
@@ -155,6 +164,11 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 
 1. ✅ MVP：10 个雪场、多模型抓取、订正 + 雪线 + 雪水比、详情页、收藏、自动更新
 2. ✅ 集合预报（ECMWF ENS、GEFS、GEPS、ICON-EPS）+ 概率与信心；地图和排行榜；第 3–5 周展望；Ikon / Epic 全部雪场；欧洲区域模型；分档更新
-3. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
-4. SNOTEL / 雪场雪报验证 + 自适应权重 + 准确率页面
+3. 准确率与决策器（进行中）
+   - ✅ standard 档加 ICON、GEM；跳过的定时运行由下一次补上
+   - ✅ 预报存档（`archive` 分支）
+   - ✅ `planner.json` + 粉雪分；"去哪滑"页（未来 5 天排雪场，更远只排日子和地区；可分享链接）
+   - SNOTEL 实测接入 → 评分 → 范围和概率校准 → 9 公里 ECMWF → 总量偏差订正 → 准确率页面
+   - 通行证分产品与限制日期、路网车程表、日历订阅提醒
+4. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
 5. 登录与跨设备同步（Supabase）、邮件粉雪警报、月 / 季展望、数据迁移到 Cloudflare R2

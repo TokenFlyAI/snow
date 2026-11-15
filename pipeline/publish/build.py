@@ -6,7 +6,7 @@ from typing import Optional
 
 import numpy as np
 
-from ..config import (API_DAILY_LIMIT, API_DAILY_TARGET, DAILY_DAYS, ENSEMBLE_BY_ID, HOURLY_HORIZON_H, MODEL_BY_ID,
+from ..config import (API_DAILY_LIMIT, API_DAILY_TARGET, DAILY_DAYS, ENSEMBLE_BY_ID, HOURLY_HORIZON_H, MODEL_BY_ID, NIGHT_START_H,
                       OUTLOOK_WEEKS, POINT_DAYS, SCHEMA_VERSION, SOURCES)
 from ..process import aggregate
 from ..process import ensemble as ens
@@ -289,7 +289,10 @@ def build_resort(resort: Resort, derived: list[Derived], now: datetime,
         }
     summary["totals"] = totals
     summary["snow_16d_cm"] = totals["16d"]["cm"]
-    nxt = next((e for e in point if (e["snow_cm"]["mid"] or 0) >= NEXT_SNOW_MIN_CM), None)
+    # today's ski day ends at 16:00 local time: after that its snow is no longer "next"
+    over = now.astimezone(idx.local_start[0].tzinfo).hour >= NIGHT_START_H
+    nxt = next((e for e in point if (e["snow_cm"]["mid"] or 0) >= NEXT_SNOW_MIN_CM
+                and not (over and e["lead_days"] == 0)), None)
     summary["next_snow"] = {"date": nxt["date"], "snow_cm": nxt["snow_cm"]} if nxt else None
     summary["daily_mid_cm"] = [e["snow_cm"]["mid"] for e in point]
 

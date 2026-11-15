@@ -102,7 +102,10 @@ def test_build_resort_document_shape_and_dropout():
     s = doc["summary"]
     assert s["snow_24h_cm"]["mid"] < s["snow_72h_cm"]["mid"] < s["snow_7d_cm"]["mid"] < s["snow_16d_cm"]["mid"]
     assert s["snow_24h_cm"]["summit"] >= s["snow_24h_cm"]["base"]
-    assert s["next_snow"]["date"] == doc["daily"][0]["date"]
+    # 22:00 local: the ski day of Jan 9 ended at 16:00, so the next snow is the Jan 10 ski day (already running)
+    assert s["next_snow"]["date"] == doc["daily"][1]["date"] == "2026-01-10"
+    morning = build_resort(r, derived, datetime(2026, 1, 9, 15, 0, tzinfo=timezone.utc))   # 07:00 in California
+    assert morning["summary"]["next_snow"]["date"] == morning["daily"][0]["date"] == "2026-01-09"
     t = s["totals"]
     assert t["3d"]["cm"]["mid"] < t["7d"]["cm"]["mid"] and t["3d"]["low_cm"] is None
     assert t["16d"]["complete"] is False                # no ensemble -> nothing beyond day 10

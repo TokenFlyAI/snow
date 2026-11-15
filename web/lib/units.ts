@@ -61,3 +61,6 @@ export function fmtThreshold(cm: number | string, u: Units): string {
   const v = Number(cm);
   return u === "imperial" ? `${Math.round(v / 2.54)}″` : `${v} cm`;
 }
+
+/** Threshold keys ("2.5", "15", ...) in ascending order. JS puts integer-like keys first, so sort explicitly. */
+export const thresholdKeys = (prob: Record<string, unknown>): string[] => Object.keys(prob).sort((a, b) => Number(a) - Number(b));

@@ -110,6 +110,12 @@ export function SnowMap({ points, breaksCm, fitKey, selectedId, onSelect, onErro
         setReady((n) => n + 1);
       };
       m.on("style.load", addLayers);
+      // the compact attribution opens itself on narrow screens and covers a third of the map: start closed
+      m.once("idle", () => {
+        const el = box.current?.querySelector(".maplibregl-ctrl-attrib");
+        el?.classList.remove("maplibregl-compact-show");
+        el?.removeAttribute("open");                    // it is a <details>: "open" is what shows the text
+      });
       m.on("click", (e) => {
         if (!m) return;
         const hit = m.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["resorts-dot"] });

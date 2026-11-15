@@ -65,3 +65,10 @@ table.data th, table.data td { padding: 7px 10px; border-bottom: 1px solid var(-
 table.data th { color: var(--text-muted); font-weight: 500; }
 table.data th:first-child, table.data td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* MapLibre controls follow the theme */
+.maplibregl-ctrl-group, .maplibregl-ctrl-attrib.maplibregl-compact { background: var(--surface) !important; border: 1px solid var(--line); box-shadow: none !important; }
+.maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib a { color: var(--text-secondary) !important; }
+.maplibregl-ctrl-group button + button { border-top: 1px solid var(--line) !important; }
+:root[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+:root[data-theme="dark"] .maplibregl-ctrl-attrib-button { filter: invert(1); }

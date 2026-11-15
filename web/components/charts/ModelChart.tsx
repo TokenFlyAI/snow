@@ -38,7 +38,7 @@ export function ModelChart({ doc, level }: { doc: ResortDoc; level: Level }) {
     },
     xAxis: { type: "category", data: labels, ...axisStyle(p),
       axisLabel: { color: p.muted, fontSize: 11, interval: 0, formatter: (v: string) => v.replace(" ", "\n") } },
-    yAxis: { type: "value", name: snowUnit(units), nameTextStyle: { color: p.muted, fontSize: 11, align: "right" }, minInterval: 1, ...axisStyle(p), axisLine: { show: false } },
+    yAxis: { type: "value", min: 0, name: snowUnit(units), nameTextStyle: { color: p.muted, fontSize: 11, align: "right" }, minInterval: 1, ...axisStyle(p), axisLine: { show: false } },
     series: [
       ...models.map((m) => ({
         name: m.label, type: "bar", barMaxWidth: 6, barGap: "15%", barCategoryGap: "24%",

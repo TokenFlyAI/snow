@@ -1,7 +1,7 @@
 "use client";
 import { fmtDate, fmtProb } from "@/lib/i18n";
 import type { DayEntry, Level } from "@/lib/types";
-import { fmtSnow, fmtThreshold, snowUnit, snowValue } from "@/lib/units";
+import { fmtSnow, fmtThreshold, snowUnit, snowValue, thresholdKeys } from "@/lib/units";
 import { useUser } from "../Providers";
 import { axisStyle, baseOption, EChart, type Palette } from "./EChart";
 
@@ -50,7 +50,7 @@ export function DailyChart({ daily, level }: { daily: DayEntry[]; level: Level }
               html += row(t("ensBand"), `${fmtSnow(d.ens.p10[level], units, false)}–${fmtSnow(d.ens.p90[level], units)}`);
             }
             html += row(t("ensMedian"), fmtSnow(d.ens.p50[level], units));
-            for (const thr of Object.keys(d.ens.prob)) {
+            for (const thr of thresholdKeys(d.ens.prob)) {
               html += row(`≥ ${fmtThreshold(thr, units)} ${t("probAtLeast")}`, fmtProb(d.ens.prob[thr][level]));
             }
             html += `<div style="color:${p.muted};margin-top:4px">${d.ens.n_members} ${t("members")}</div>`;

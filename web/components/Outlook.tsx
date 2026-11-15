@@ -2,7 +2,7 @@
 import { fmtProb, fmtRange } from "@/lib/i18n";
 import type { OutlookWeek, ProbDay, Level } from "@/lib/types";
 import { fmtDate } from "@/lib/i18n";
-import { fmtSnow, fmtThreshold } from "@/lib/units";
+import { fmtSnow, fmtThreshold, thresholdKeys } from "@/lib/units";
 import { useUser } from "./Providers";
 
 /** A probability as a number with a thin single-hue meter (the number is the label, the bar is the picture). */
@@ -22,7 +22,7 @@ function Meter({ p }: { p: number | null | undefined }) {
 export function ProbDays({ days, level }: { days: ProbDay[]; level: Level }) {
   const { t, lang, units } = useUser();
   if (days.length === 0) return null;
-  const thresholds = Object.keys(days[0].ens.prob);
+  const thresholds = thresholdKeys(days[0].ens.prob);
   return (
     <div className="mt-5">
       <h3 className="text-sm font-semibold">{t("probTitle")}</h3>
@@ -66,7 +66,7 @@ export function OutlookWeeks({ weeks }: { weeks: OutlookWeek[] }) {
             <span className="num text-xs text-ink-3">{fmtRange(w.start, w.end)}</span>
           </div>
           <dl className="mt-2 space-y-1.5">
-            {Object.keys(w.prob).map((thr) => (
+            {thresholdKeys(w.prob).map((thr) => (
               <div key={thr} className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
                 <dt className="num text-xs text-ink-2">≥ {fmtThreshold(thr, units)}</dt>
                 <dd><Meter p={w.prob[thr]} /></dd>

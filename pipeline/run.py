@@ -40,6 +40,7 @@ from .resorts import Resort, load_resorts
 from .state import DEFAULT_PREVIOUS, Previous, age_hours, parse_time
 from .verify import archive
 from .verify.obs import load_stations
+from .verify.score import build_verification
 
 log = logging.getLogger("pipeline")
 MIN_MODELS_OK = 2
@@ -246,7 +247,10 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
         except Exception as e:  # noqa: BLE001  the archive must never stop a publish
             log.warning("forecast archive not written: %s", e)
     if stations_path:
-        run_info["obs"] = publish_obs(out_dir, resorts, load_stations(stations_path), now, prev)
+        run_info["obs"] = publish_obs(out_dir, resorts, load_stations(stations_path), now, prev,
+                                      archive_dir=archive_dir)
+    if archive_dir is not None:
+        run_info["verification"] = publish_verification(out_dir, archive_dir, db.resorts, now, prev)
     _write(out_dir / "resorts.json", build_index(db.regions, docs, now))
     _write(out_dir / "planner.json", build_planner(db.regions, docs, now))
     # manifest is written last: its presence marks a complete run
@@ -259,8 +263,9 @@ def run(out_dir: Path, only: list[str] | None = None, resorts_path: str | None =
 
 
 def publish_obs(out_dir: Path, resorts: list[Resort], stations: dict[str, list[dict]], now: datetime,
-                prev: Previous, fetch=None) -> dict:
-    """obs/{id}.json for resorts with stations; on failure the previous files are kept. Never fails the run."""
+                prev: Previous, fetch=None, archive_dir: Optional[Path] = None) -> dict:
+    """obs/{id}.json for resorts with stations; on failure the previous files are kept. Never fails the run.
+    With archive_dir the completed observed days also go to the archive (for scoring)."""
     wanted = [r for r in resorts if stations.get(r.id)]
     try:
         docs = build_obs_docs(wanted, stations, now, fetch)
@@ -268,6 +273,11 @@ def publish_obs(out_dir: Path, resorts: list[Resort], stations: dict[str, list[d
     except Exception as e:  # noqa: BLE001  observations are an extra: never stop a publish
         log.warning("observations not refreshed (%s): keeping the previous files", e)
         docs, status = {}, "previous"
+    if archive_dir is not None and docs:
+        try:
+            archive.write_obs(archive_dir, docs.values())
+        except Exception as e:  # noqa: BLE001
+            log.warning("observations not archived: %s", e)
     missing = [r.id for r in wanted if r.id not in docs]
     for rid, d in prev.get_many(f"obs/{rid}.json" for rid in missing).items():
         if d:
@@ -275,6 +285,23 @@ def publish_obs(out_dir: Path, resorts: list[Resort], stations: dict[str, list[d
     for rid, d in docs.items():
         _write(out_dir / "obs" / f"{rid}.json", d)
     return {"status": status, "resorts": len(docs), "resorts_with_stations": len(wanted)}
+
+
+def publish_verification(out_dir: Path, archive_dir: Path, resorts: list[Resort], now: datetime,
+                         prev: Previous) -> dict:
+    """verification.json from the archive (A3); on failure the previous file is kept. Never fails the run."""
+    try:
+        doc = build_verification(archive_dir, {r.id: r.region for r in resorts}, now)
+        status = "ok"
+    except Exception as e:  # noqa: BLE001
+        log.warning("verification not computed (%s): keeping the previous file", e)
+        doc, status = prev.get("verification.json"), "previous"
+    if doc:
+        _write(out_dir / "verification.json", doc)
+        season = doc["windows"]["season"]
+        log.info("verification: %d resorts, %d ski days scored this season", season["resorts"], season["ski_days"])
+        return {"status": status, "season_ski_days": season["ski_days"], "season_resorts": season["resorts"]}
+    return {"status": "none"}
 
 
 def main(argv: list[str] | None = None) -> int:

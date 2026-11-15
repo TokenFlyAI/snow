@@ -4,6 +4,10 @@ Each pipeline run writes one file with a row per (refreshed resort, ski day):
 
     forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz        (UTC time of the run)
 
+and rewrites the observed ski days of the last two weeks (stations revise readings for a while):
+
+    obs/YYYY/MM/YYYY-MM-DD.jsonl.gz            (one file per ski day, all resorts with a station)
+
 Only resorts whose document was rebuilt in that run are written, so a forecast appears once, at the
 time it was issued. The forecast workflow commits these files to the orphan branch `archive` of this
 repository; publishing never depends on it.
@@ -40,8 +44,9 @@ README = """# Forecast archive
 
 Every forecast published at https://tokenfly.ai/snow/, written by the `forecast` workflow of the main
 branch. `forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz` holds one JSON row per (resort, ski day) for the resorts
-refreshed in that run. The row format is documented in `pipeline/verify/archive.py` on `main`; read it
-back with `pipeline.verify.archive.read_rows`.
+refreshed in that run. `obs/YYYY/MM/YYYY-MM-DD.jsonl.gz` holds what the nearby SNOTEL stations measured
+on that ski day. The row formats are documented in `pipeline/verify/archive.py` on `main`; read them
+back with `pipeline.verify.archive.read_rows` and `read_obs`.
 """
 
 
@@ -90,21 +95,74 @@ def write_run(root: Path | str, docs: Iterable[dict], issued: datetime) -> Optio
         return None
     root = Path(root)
     path = path_for(root, issued)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    body = "".join(json.dumps(r, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n" for r in rows)
-    # mtime=0: the same rows always give the same bytes
-    with open(path, "wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0) as gz:
-        gz.write(body.encode("utf-8"))
+    _write_gz(path, rows)            # gzip mtime=0: the same rows always give the same bytes
     readme = root / "README.md"
     if not readme.exists():
         readme.write_text(README, encoding="utf-8")
     return path
 
 
+# ---- observations ----------------------------------------------------------------------------
+
+def obs_path(root: Path, day: str) -> Path:
+    return Path(root) / "obs" / day[:4] / day[5:7] / f"{day}.jsonl.gz"
+
+
+def _write_gz(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = "".join(json.dumps(r, ensure_ascii=False, separators=(",", ":"), allow_nan=False) + "\n" for r in rows)
+    with open(path, "wb") as f, gzip.GzipFile(fileobj=f, mode="wb", mtime=0) as gz:
+        gz.write(body.encode("utf-8"))
+
+
+def write_obs(root: Path | str, obs_docs: Iterable[dict]) -> list[Path]:
+    """Write the completed observed ski days of the obs documents (pipeline/publish/obs_docs.py).
+
+    Row: target_date, resort_id, station (triplet), grade, rank (0 = best station of the resort) and
+    the ObsDay fields of pipeline/verify/obs.py. A day file is rewritten as a whole each time."""
+    by_day: dict[str, list[dict]] = {}
+    for d in obs_docs:
+        for rank, st in enumerate(d.get("stations") or []):
+            for day in st.get("days") or []:
+                if not day.get("complete"):
+                    continue
+                row = {"target_date": day["date"], "resort_id": d["resort_id"], "station": st["triplet"],
+                       "grade": st.get("grade"), "rank": rank}
+                row.update({k: v for k, v in day.items() if k not in ("date", "complete")})
+                by_day.setdefault(day["date"], []).append(row)
+    root = Path(root)
+    paths = []
+    for day, rows in sorted(by_day.items()):
+        path = obs_path(root, day)
+        # keep rows of resorts that are not in this run (e.g. a station that did not answer)
+        if path.exists():
+            have = {(r["resort_id"], r["station"]) for r in rows}
+            with gzip.open(path, "rt", encoding="utf-8") as fh:
+                rows += [r for r in map(json.loads, fh) if (r["resort_id"], r["station"]) not in have]
+        rows.sort(key=lambda r: (r["resort_id"], r["rank"]))
+        _write_gz(path, rows)
+        paths.append(path)
+    if paths and not (root / "README.md").exists():
+        (root / "README.md").write_text(README, encoding="utf-8")
+    return paths
+
+
+def read_obs(root: Path | str, start: Optional[date] = None, end: Optional[date] = None) -> Iterator[dict]:
+    """Observed ski-day rows with target dates between start and end (inclusive), oldest first."""
+    for f in sorted((Path(root) / "obs").glob("*/*/*.jsonl.gz")):
+        day = date.fromisoformat(f.name[:10])
+        if (start and day < start) or (end and day > end):
+            continue
+        with gzip.open(f, "rt", encoding="utf-8") as fh:
+            yield from map(json.loads, fh)
+
+
 def read_rows(root: Path | str, resort_ids: Optional[Iterable[str]] = None,
               start: Optional[date] = None, end: Optional[date] = None) -> Iterator[dict]:
-    """Rows of the forecasts issued between `start` and `end` (UTC dates, inclusive), oldest first."""
-    want = set(resort_ids) if resort_ids else None
+    """Rows of the forecasts issued between `start` and `end` (UTC dates, inclusive), oldest first.
+    `resort_ids`: only these resorts (an empty set gives nothing; None gives all)."""
+    want = set(resort_ids) if resort_ids is not None else None
+    key = '"resort_id":"'
     for f in sorted((Path(root) / "forecasts").glob("*/*/*/*.jsonl.gz")):
         y, m, d = (int(x) for x in f.parts[-4:-1])
         day = date(y, m, d)
@@ -112,6 +170,8 @@ def read_rows(root: Path | str, resort_ids: Optional[Iterable[str]] = None,
             continue
         with gzip.open(f, "rt", encoding="utf-8") as fh:
             for line in fh:
-                row = json.loads(line)
-                if want is None or row["resort_id"] in want:
-                    yield row
+                if want is not None:            # skip other resorts without parsing the row
+                    i = line.find(key) + len(key)
+                    if line[i: line.find('"', i)] not in want:
+                        continue
+                yield json.loads(line)

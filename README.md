@@ -56,6 +56,7 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 | `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）；逐日：前 10 天点值（夜间 / 白天降雪、集合 10–90% 范围、信心、雪质），第 11–16 天只有集合分位数和概率；第 3–5 周展望；各模型逐日降雪 |
 | `ens/{id}.json` | 集合各成员的滑雪日降雪（未订正的原始值），供下一次运行复用，前端不读 |
 | `planner.json` | "去哪滑"页用的紧凑数据：每个雪场每个滑雪日的粉雪分、开门时新雪、全天降雪和范围、≥2.5 / 15 cm 概率、雪质、阵风、雨（约 280 KB，压缩后约 45 KB）。字段和粉雪分的定义见 `pipeline/publish/planner.py` |
+| `verification.json` | 评分（A3）：存档的预报对照存档的实测，最近 30 天和本雪季，总体 / 按大区 / 按雪场，按提前 1、2、3、5、7、10 天分别算：降雪和降水的平均绝对误差与偏差、大雪日（≥15 cm）命中和空报、≥15 / 2.5 cm 概率的 Brier 分数、范围覆盖率、各原始模型的误差和相对 NBM 的技巧分。定义见 `pipeline/verify/score.py`。存档从 2026-11-15 开始，头几周样本很少 |
 | `obs/{id}.json` | 有 SNOTEL 站的雪场（美国西部 34 个）：附近 1–3 个站最近 14 个滑雪日的实测（夜间 / 全天新雪、降水、雪深、气温、质量标记）。见下面"实测" |
 
 ### 实测（SNOTEL）
@@ -66,7 +67,7 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 
 ### 预报存档
 
-每次运行把**本次重新计算的**雪场预报逐日写成一行，存到本仓库的孤立分支 [`archive`](https://github.com/TokenFlyAI/snow/tree/archive)：`forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz`（约 240 KB/天）。用来以后对照实测评分、校准范围和概率；线上算法以 `method: "v2"` 冻结为基线。行格式和读取函数在 `pipeline/verify/archive.py`，推送由 `scripts/push_archive.sh` 完成；存档失败不影响发布。
+每次运行把**本次重新计算的**雪场预报逐日写成一行，存到本仓库的孤立分支 [`archive`](https://github.com/TokenFlyAI/snow/tree/archive)：`forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz`（约 240 KB/天）；实测的滑雪日存在 `obs/YYYY/MM/YYYY-MM-DD.jsonl.gz`（最近两周每次重写，测站会回头修正读数）。workflow 在跑管道前先把这个分支解压到 `archive/`，管道追加本次的文件并据此评分，发布后再推回去。用来以后对照实测评分、校准范围和概率；线上算法以 `method: "v2"` 冻结为基线。行格式和读取函数在 `pipeline/verify/archive.py`，推送由 `scripts/push_archive.sh` 完成；存档失败不影响发布。
 
 数据格式版本是 `schema_version: 2`（字段说明见 `docs/phase2-handoff.md` §2.6 和 `web/lib/types.ts`）。
 
@@ -178,7 +179,8 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
    - ✅ 预报存档（`archive` 分支）
    - ✅ `planner.json` + 粉雪分；"去哪滑"页（未来 5 天排雪场，更远只排日子和地区；可分享链接）
    - ✅ SNOTEL 实测接入（美国西部 34 个雪场，详情页"附近实测"）
-   - 评分 → 范围和概率校准 → 9 公里 ECMWF → 总量偏差订正 → 准确率页面
+   - ✅ 评分（`verification.json`，每次运行滚动更新；样本要积累几周）
+   - 范围和概率校准 → 9 公里 ECMWF → 总量偏差订正 → 准确率页面
    - 通行证分产品与限制日期、路网车程表、日历订阅提醒
 4. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
 5. 登录与跨设备同步（Supabase）、邮件粉雪警报、月 / 季展望、数据迁移到 Cloudflare R2

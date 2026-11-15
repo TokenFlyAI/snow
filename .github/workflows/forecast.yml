@@ -36,6 +36,15 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Unit tests
         run: python -m pytest -q
+      # The orphan branch "archive" holds every forecast and observation so far: the run adds this
+      # run's files to it and scores the forecasts against the observations (verification.json).
+      # No branch yet, or a failed fetch, just means scoring starts from what this run adds.
+      - name: Fetch the archive
+        continue-on-error: true
+        run: |
+          mkdir -p archive
+          if git fetch -q --depth 1 origin archive; then git archive FETCH_HEAD | tar -x -C archive; fi
+          du -sh archive
       - name: Run pipeline
         run: python -m pipeline.run --out site/data/v1 --archive archive
       - name: Add landing page
@@ -63,9 +72,8 @@ jobs:
         if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
 
-      # Every issued forecast is kept on the orphan branch "archive" so it can be scored against
-      # observations later (pipeline/verify/archive.py). Only after a successful deploy, and a
-      # failure here never fails the run.
+      # This run's forecasts and the observed days go back to the "archive" branch
+      # (pipeline/verify/archive.py). Only after a successful deploy; a failure never fails the run.
       - name: Archive the issued forecasts
         continue-on-error: true
         run: |

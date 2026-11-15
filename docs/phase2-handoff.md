@@ -6,23 +6,23 @@
 
 ---
 
-## 0. 一页摘要
+## 0. 一页摘要（2026-11-14 晚更新）
 
 | | 状态 |
 |---|---|
-| 集合预报抓取 + 分位数 / 概率 / 信心 / 第 3–5 周展望 | ✅ 代码完成，单元测试通过，3 个雪场真实抓取跑通 |
-| 雪场库扩到 Ikon + Epic 2026-27 全部雪场 | ✅ 229 个预报点（10 个手工 + 219 个脚本生成），46 个标了 `needs_review` |
-| 欧洲区域模型 | ✅ Météo-France、MeteoSwiss、UKMO（另有 CMA 给中国）；每个雪场最多 8 个模型 |
-| API 分档与预算 | ✅ 代码完成；按计划估算每天 **6,069** 次加权调用（目标 < 8,000，上限 10,000） |
-| 前端：集合区间带、第 11–16 天概率表、展望、地图页、排行页 | 🟡 代码写完，**`tsc` 还有 3 个类型错误**，没有构建过，没有在浏览器里看过 |
-| `python -m pytest -q` | ✅ 101 passed |
-| 全量 `python -m pipeline.run`（229 个点） | ❌ 没跑过 |
-| GitHub `forecast` workflow | ❌ 没跑过（代码还没提交） |
-| 浏览器手机宽度深色模式截图 | ❌ 没做 |
-| README 更新 | ❌ 没做 |
-| 部署主站外壳（tokenfly） | ❌ 没做，**必须先给用户看结果、拿到同意再推送** |
+| 集合预报 + 分位数 / 概率 / 信心 / 第 3–5 周展望 | ✅ 完成 |
+| 雪场库：Ikon + Epic 2026-27 全部雪场 | ✅ 229 个预报点，44 个 `needs_review`（§5） |
+| 欧洲区域模型 | ✅ Météo-France、MeteoSwiss、UKMO；欧洲 4 个重点雪场使用 |
+| API 分档与预算 | ✅ 估算每天 6,464 次（28 个重点雪场）；限速器每分钟 480、每小时 4,800 |
+| 全量本地运行（229 点，`--mode full`） | ✅ 229/229，实测 **4,451** 次加权调用，与估算一致；所有模型和集合 100% 成功 |
+| 按计划运行（`--previous` 沿用上一版） | ✅ 刷新 28、沿用 201，实测 722 次 |
+| 前端 | ✅ typecheck + build 通过；已在浏览器里按手机宽度、深 / 浅色检查雪场页、地图、排行、方法页 |
+| `python -m pytest -q` | ✅ 103 passed；CI 两项通过 |
+| PR | [TokenFlyAI/snow#1](https://github.com/TokenFlyAI/snow/pull/1) |
+| GitHub `forecast` workflow | 见 PR 合并后的运行 |
+| 部署主站外壳（tokenfly） | ❌ 未做，**必须先给用户看结果、拿到同意再推送** |
 
-**所有改动都还没提交**，在 `snow` 仓库 `main` 分支的工作区里（`git status` 可见）。接手第一步建议：`git switch -c phase2` 再继续。
+全量运行的观察：订正系数中位数 1.0，22/229 顶到上下限（多为只有 GEFS 的欧洲 standard 雪场，全球集合在阿尔卑斯严重偏干，例如 Veysonnaz 融合 91 cm vs GEFS 17 cm）；单个雪场文档约 29 KB，全部约 6.9 MB，`ens/` 约 1.2 MB，`resorts.json` 约 360 KB。
 
 ---
 
@@ -211,14 +211,14 @@ WP5 雪场数据复核 —— 可随时并行，结果在下一次 forecast 运�
 
 不同工作包改的文件不重叠：WP1/WP2 → `web/`；WP3 → `pipeline/config.py`、`pipeline/run.py`、`.github/workflows/`、`README.md`、`tests/test_run_plan.py`；WP5 → `data/resort_seed.txt`、`data/resorts.yaml`、`scripts/build_resorts.py`。WP4 只读代码、只写 `site/`（gitignore）。
 
-### WP1 前端类型修复与构建（小）
+### WP1 前端类型修复与构建（✅ 已完成）
 
 - 问题：`npx tsc --noEmit` 在 `web/components/map/SnowMap.tsx` 第 67、77、83 行报错：`latest.current.theme` 被推断成 `string`，不能用来索引 `STYLE` / `SNOW_RAMP`。修法：`type Theme = "light" | "dark"`，`const theme: Theme = ...`，并给 `latest` 的 `useRef` 标类型。
 - 然后 `cd web && npm run typecheck && NEXT_PUBLIC_DATA_BASE=/snow/data/v1 npm run build`。
 - 检查：构建产物里有 229 个 `resort/*/index.html`、`map/`、`rank/`；MapLibre 是动态 import，不应进首页包（看 `next build` 输出的首屏 JS 大小）。
 - 完成标准：typecheck、build 都通过。
 
-### WP2 浏览器验证（必须看页面，不能只靠单测）
+### WP2 浏览器验证（✅ 已完成，修了阈值顺序、模型图负轴、地图版权框、深色控件、"下一场雪"指向已结束的滑雪日）
 
 - 数据：用 WP4 生成的 `site/data/v1`；WP4 没好时先跑小规模：`python -m pipeline.run --out site/data/v1 --resorts alta,kirkwood,niseko-hirafu,zermatt,val-thorens,whistler-blackcomb --mode full --previous none`（约 150 次加权调用）。
 - 本地预览：README「本地运行」一节的方法（`web/out/` 复制到 tokenfly 的 `aiverse/snow/`，数据复制到 `aiverse/snow/data`，`PORT=10081 python server.py`，打开 `http://localhost:10081/snow/`）。**跑完把 tokenfly 的 `stats.db`、`games/data/games.json` 用 `git checkout --` 还原，`aiverse/snow/` 也还原**（那是 WP7 的事）。也可以直接对 `web/out` 起一个静态服务器并把 basePath 对上。
@@ -231,7 +231,7 @@ WP5 雪场数据复核 —— 可随时并行，结果在下一次 forecast 运�
 - 交付：截图（手机宽度 + 深色）给用户；发现的问题直接修。
 - 完成标准：所有页面无报错（控制台、网络）、截图齐全。
 
-### WP3 预算加固、workflow、README（建议在第一次上线前完成）
+### WP3 预算加固、workflow、README（✅ 已完成：FRESH_WITHIN_H=18、每小时上限、重试只计一次、超时 45 分钟、README 已更新）
 
 1. **首日预算超标风险**（见 §6 风险 1）：建议把 `FRESH_WITHIN_H` 从 5 改到 18——正常的每日刷新在时段到来时已经约 24 小时，不受影响；而全量运行之后 18 小时内各地区时段不会再刷一遍。改后更新 `tests/test_run_plan.py` 的相关用例。
 2. `.github/workflows/forecast.yml`：`timeout-minutes: 20` → 40（全量运行约 4,450 加权调用，限速器每分钟 480，至少 9–10 分钟，加上下载上一版 229×2 个文件）。
@@ -239,7 +239,7 @@ WP5 雪场数据复核 —— 可随时并行，结果在下一次 forecast 运�
 4. `README.md` 更新：第二阶段架构（分档、读上一版、`ens/` 目录、schema v2）、集合方法、预算数字、`build_resorts.py` 用法、加雪场流程改为"改种子表 → 跑脚本"、路线图把第 2 阶段标完成、"已知限制"里"信心只看确定性模型"那条删掉。
 5. 完成标准：`pytest` 通过；README 与代码一致。
 
-### WP4 全量本地运行（实测预算）
+### WP4 全量本地运行（✅ 已完成：4,451 次）
 
 - 命令：`python -m pipeline.run --out site/data/v1 --mode full --previous none -v`。
 - 代价：约 4,450 次加权调用，**算在本机 IP 上**（GitHub Actions 是另一组 IP，不共用额度）。同一天本机不要跑第二次全量。
@@ -247,7 +247,7 @@ WP5 雪场数据复核 —— 可随时并行，结果在下一次 forecast 运�
 - 再跑一次 `--mode auto --previous site/data/v1 --out site2/data/v1` 验证"带过"逻辑：只应刷新 featured 和当前时段的地区。
 - 完成标准：给出实测用量数字，写进 PR 描述。
 
-### WP5 雪场数据复核（46 个 `needs_review`）
+### WP5 雪场数据复核（部分完成：修了共用坐标和两个山谷站海拔，剩 44 个 `needs_review`）
 
 逐个处理：改 `data/resort_seed.txt`（`r=`、`osm=`、`wiki=`、海拔）后重跑 `python scripts/build_resorts.py`（有缓存，很快；改了搜索参数的会重新查 Overpass，Overpass 常 502，脚本会自动退避重试）。确认无误但仍被规则标记的，可以在种子表里修正海拔使其通过，或者接受并在报告里说明。需要人看的清单在 §5。另外：
 
@@ -294,7 +294,7 @@ python -c "from pipeline.config import *; from pipeline.resorts import load_reso
 
 ---
 
-## 5. 需要人工复核的 46 个雪场
+## 5. 需要人工复核的雪场（写于 46 个时；Grouse、Kitzsteinhorn、Verbier 系列已处理，现 44 个，以 `raw/build_resorts/report.md` 为准）
 
 规则见 §2.8。"DEM" 是 OSM 索道站点在高程模型上的最低–最高海拔，常因混入邻近雪场或山谷缆车而偏离，不一定是我们的数据错。
 

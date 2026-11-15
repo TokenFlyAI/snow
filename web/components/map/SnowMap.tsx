@@ -111,11 +111,18 @@ export function SnowMap({ points, breaksCm, fitKey, selectedId, onSelect, onErro
       };
       m.on("style.load", addLayers);
       // the compact attribution opens itself on narrow screens and covers a third of the map: start closed
-      m.once("idle", () => {
+      // The compact attribution opens itself on narrow screens, once, as soon as the style brings its
+      // attribution text. Close it right after that (our listeners run after the control's own).
+      const closeAttrib = () => {
         const el = box.current?.querySelector(".maplibregl-ctrl-attrib");
-        el?.classList.remove("maplibregl-compact-show");
-        el?.removeAttribute("open");                    // it is a <details>: "open" is what shows the text
-      });
+        if (!el?.classList.contains("maplibregl-compact")) return;
+        el.classList.remove("maplibregl-compact-show");
+        el.removeAttribute("open");                     // it is a <details>: "open" is what shows the text
+        m?.off("styledata", closeAttrib);
+        m?.off("sourcedata", closeAttrib);
+      };
+      m.on("styledata", closeAttrib);
+      m.on("sourcedata", closeAttrib);
       m.on("click", (e) => {
         if (!m) return;
         const hit = m.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["resorts-dot"] });
@@ -167,7 +174,7 @@ export function SnowMap({ points, breaksCm, fitKey, selectedId, onSelect, onErro
     if (pts.length === 0) return;
     let w = 180, e = -180, s = 90, n = -90;
     for (const p of pts) { w = Math.min(w, p.lon); e = Math.max(e, p.lon); s = Math.min(s, p.lat); n = Math.max(n, p.lat); }
-    if (e - w > 200) { m.easeTo({ center: [-40, 35], zoom: 0.6, duration: 0 }); return; }   // the whole world
+    if (e - w > 200) { m.easeTo({ center: [-52, 40], zoom: 0.6, duration: 0 }); return; }   // whole world: North America to the Alps
     m.fitBounds([[w, s], [e, n]], { padding: 48, maxZoom: 8.5, duration: 400 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey, ready > 0]);

@@ -62,7 +62,7 @@ export default function Rank() {
           <ol className="card mt-3 divide-y divide-line">
             {shown.map(({ r, v }, i) => (
               <li key={r.id}>
-                <Link href={`/resort/${r.id}/`} className="flex items-center gap-3 px-4 py-3">
+                <Link prefetch={false} href={`/resort/${r.id}/`} className="flex items-center gap-3 px-4 py-3">
                   <span className="num w-6 text-sm text-ink-3">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

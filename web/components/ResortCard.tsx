@@ -29,7 +29,7 @@ export function ResortCard({ r, region }: { r: IndexResort; region?: Region }) {
     </div>
   );
   return (
-    <Link href={`/resort/${r.id}/`} className="card block p-4 transition-colors hover:border-ink-3">
+    <Link prefetch={false} href={`/resort/${r.id}/`} className="card block p-4 transition-colors hover:border-ink-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold">{resortName(r, lang)}</h3>

@@ -47,7 +47,7 @@ export default function Home() {
                 const max = Math.max(ranked[0]?.summary.snow_7d_cm[level] ?? 0, 1);
                 return (
                   <li key={r.id}>
-                    <Link href={`/resort/${r.id}/`} className="flex items-center gap-3 px-4 py-3">
+                    <Link prefetch={false} href={`/resort/${r.id}/`} className="flex items-center gap-3 px-4 py-3">
                       <span className="num w-5 text-sm text-ink-3">{i + 1}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

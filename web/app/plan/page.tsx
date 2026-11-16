@@ -191,7 +191,7 @@ export default function Plan() {
             <ol className="card mt-2 divide-y divide-line">
               {shown.map(({ r, d, ahead, adv }) => (
                 <li key={`${r.id}-${d.date}`}>
-                  <Link href={`/resort/${r.id}/`} className="flex gap-3 px-4 py-3">
+                  <Link prefetch={false} href={`/resort/${r.id}/`} className="flex gap-3 px-4 py-3">
                     <div className="flex w-11 shrink-0 flex-col items-center pt-0.5">
                       <span className="num text-lg font-semibold leading-6">{d.score}</span>
                       <span className="text-[10px] leading-3 text-ink-3">{t("planScore")}</span>

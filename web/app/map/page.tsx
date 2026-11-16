@@ -86,7 +86,7 @@ export default function MapPage() {
             <ul className="card divide-y divide-line">
               {(region === "all" ? list.slice(0, 30) : list).map(({ r, v }) => (
                 <li key={r.id}>
-                  <Link href={`/resort/${r.id}/`} onMouseEnter={() => setSelected(r.id)}
+                  <Link prefetch={false} href={`/resort/${r.id}/`} onMouseEnter={() => setSelected(r.id)}
                     className="flex items-center gap-3 px-4 py-2.5">
                     <span aria-hidden className="inline-block h-3 w-3 shrink-0 rounded-full border border-line"
                       style={{ background: v.cm < breaksCm[0] ? ramp.none : ramp.steps[breaksCm.filter((b) => v.cm >= b).length - 1] }} />

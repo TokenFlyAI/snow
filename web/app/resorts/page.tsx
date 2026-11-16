@@ -44,7 +44,7 @@ export default function Resorts() {
               const s = summary(r.id);
               return (
                 <li key={r.id} className="flex items-center gap-3 px-4 py-3">
-                  <Link href={`/resort/${r.id}/`} className="min-w-0 flex-1">
+                  <Link prefetch={false} href={`/resort/${r.id}/`} className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{resortName(r, lang)}</div>
                     <div className="mt-1"><PassBadges passes={r.passes} /></div>
                   </Link>

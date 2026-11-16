@@ -1,0 +1,71 @@
+# Starting points for the planner's drive-time filter (scripts/build_drive_table.py -> data/drive.json).
+# lat/lon: city centre. Drive times are to every resort within MAX_GC_KM in a straight line.
+groups:
+  - {id: us-west, name: "US West", name_zh: "美国西部"}
+  - {id: us-east, name: "US East / Midwest", name_zh: "美国东部 / 中西部"}
+  - {id: canada, name: "Canada", name_zh: "加拿大"}
+  - {id: europe, name: "Europe", name_zh: "欧洲"}
+  - {id: asia, name: "Asia", name_zh: "亚洲"}
+  - {id: south, name: "Southern Hemisphere", name_zh: "南半球"}
+
+cities:
+  - {id: seattle, name: Seattle, name_zh: 西雅图, group: us-west, lat: 47.6062, lon: -122.3321}
+  - {id: portland, name: Portland, name_zh: 波特兰, group: us-west, lat: 45.5152, lon: -122.6784}
+  - {id: spokane, name: Spokane, name_zh: 斯波坎, group: us-west, lat: 47.6588, lon: -117.4260}
+  - {id: boise, name: Boise, name_zh: 博伊西, group: us-west, lat: 43.6150, lon: -116.2023}
+  - {id: san-francisco, name: San Francisco, name_zh: 旧金山, group: us-west, lat: 37.7749, lon: -122.4194}
+  - {id: san-jose, name: San Jose, name_zh: 圣何塞, group: us-west, lat: 37.3382, lon: -121.8863}
+  - {id: sacramento, name: Sacramento, name_zh: 萨克拉门托, group: us-west, lat: 38.5816, lon: -121.4944}
+  - {id: reno, name: Reno, name_zh: 里诺, group: us-west, lat: 39.5296, lon: -119.8138}
+  - {id: los-angeles, name: Los Angeles, name_zh: 洛杉矶, group: us-west, lat: 34.0522, lon: -118.2437}
+  - {id: san-diego, name: San Diego, name_zh: 圣迭戈, group: us-west, lat: 32.7157, lon: -117.1611}
+  - {id: las-vegas, name: Las Vegas, name_zh: 拉斯维加斯, group: us-west, lat: 36.1699, lon: -115.1398}
+  - {id: phoenix, name: Phoenix, name_zh: 凤凰城, group: us-west, lat: 33.4484, lon: -112.0740}
+  - {id: salt-lake-city, name: Salt Lake City, name_zh: 盐湖城, group: us-west, lat: 40.7608, lon: -111.8910}
+  - {id: denver, name: Denver, name_zh: 丹佛, group: us-west, lat: 39.7392, lon: -104.9903}
+  - {id: albuquerque, name: Albuquerque, name_zh: 阿尔伯克基, group: us-west, lat: 35.0844, lon: -106.6504}
+  - {id: anchorage, name: Anchorage, name_zh: 安克雷奇, group: us-west, lat: 61.2181, lon: -149.9003}
+  - {id: boston, name: Boston, name_zh: 波士顿, group: us-east, lat: 42.3601, lon: -71.0589}
+  - {id: new-york, name: New York, name_zh: 纽约, group: us-east, lat: 40.7128, lon: -74.0060}
+  - {id: philadelphia, name: Philadelphia, name_zh: 费城, group: us-east, lat: 39.9526, lon: -75.1652}
+  - {id: washington-dc, name: Washington DC, name_zh: 华盛顿, group: us-east, lat: 38.9072, lon: -77.0369}
+  - {id: pittsburgh, name: Pittsburgh, name_zh: 匹兹堡, group: us-east, lat: 40.4406, lon: -79.9959}
+  - {id: charlotte, name: Charlotte, name_zh: 夏洛特, group: us-east, lat: 35.2271, lon: -80.8431}
+  - {id: cleveland, name: Cleveland, name_zh: 克利夫兰, group: us-east, lat: 41.4993, lon: -81.6944}
+  - {id: detroit, name: Detroit, name_zh: 底特律, group: us-east, lat: 42.3314, lon: -83.0458}
+  - {id: chicago, name: Chicago, name_zh: 芝加哥, group: us-east, lat: 41.8781, lon: -87.6298}
+  - {id: minneapolis, name: Minneapolis, name_zh: 明尼阿波利斯, group: us-east, lat: 44.9778, lon: -93.2650}
+  - {id: st-louis, name: St. Louis, name_zh: 圣路易斯, group: us-east, lat: 38.6270, lon: -90.1994}
+  - {id: vancouver, name: Vancouver, name_zh: 温哥华, group: canada, lat: 49.2827, lon: -123.1207}
+  - {id: calgary, name: Calgary, name_zh: 卡尔加里, group: canada, lat: 51.0447, lon: -114.0719}
+  - {id: edmonton, name: Edmonton, name_zh: 埃德蒙顿, group: canada, lat: 53.5461, lon: -113.4938}
+  - {id: toronto, name: Toronto, name_zh: 多伦多, group: canada, lat: 43.6532, lon: -79.3832}
+  - {id: montreal, name: Montreal, name_zh: 蒙特利尔, group: canada, lat: 45.5017, lon: -73.5673}
+  - {id: quebec-city, name: Quebec City, name_zh: 魁北克城, group: canada, lat: 46.8139, lon: -71.2080}
+  - {id: geneva, name: Geneva, name_zh: 日内瓦, group: europe, lat: 46.2044, lon: 6.1432}
+  - {id: lyon, name: Lyon, name_zh: 里昂, group: europe, lat: 45.7640, lon: 4.8357}
+  - {id: grenoble, name: Grenoble, name_zh: 格勒诺布尔, group: europe, lat: 45.1885, lon: 5.7245}
+  - {id: paris, name: Paris, name_zh: 巴黎, group: europe, lat: 48.8566, lon: 2.3522}
+  - {id: zurich, name: Zurich, name_zh: 苏黎世, group: europe, lat: 47.3769, lon: 8.5417}
+  - {id: milan, name: Milan, name_zh: 米兰, group: europe, lat: 45.4642, lon: 9.1900}
+  - {id: turin, name: Turin, name_zh: 都灵, group: europe, lat: 45.0703, lon: 7.6869}
+  - {id: venice, name: Venice, name_zh: 威尼斯, group: europe, lat: 45.4408, lon: 12.3155}
+  - {id: munich, name: Munich, name_zh: 慕尼黑, group: europe, lat: 48.1351, lon: 11.5820}
+  - {id: stuttgart, name: Stuttgart, name_zh: 斯图加特, group: europe, lat: 48.7758, lon: 9.1829}
+  - {id: innsbruck, name: Innsbruck, name_zh: 因斯布鲁克, group: europe, lat: 47.2692, lon: 11.4041}
+  - {id: salzburg, name: Salzburg, name_zh: 萨尔茨堡, group: europe, lat: 47.8095, lon: 13.0550}
+  - {id: vienna, name: Vienna, name_zh: 维也纳, group: europe, lat: 48.2082, lon: 16.3738}
+  - {id: barcelona, name: Barcelona, name_zh: 巴塞罗那, group: europe, lat: 41.3851, lon: 2.1734}
+  - {id: toulouse, name: Toulouse, name_zh: 图卢兹, group: europe, lat: 43.6047, lon: 1.4442}
+  - {id: tokyo, name: Tokyo, name_zh: 东京, group: asia, lat: 35.6812, lon: 139.7671}
+  - {id: osaka, name: Osaka, name_zh: 大阪, group: asia, lat: 34.6937, lon: 135.5023}
+  - {id: sapporo, name: Sapporo, name_zh: 札幌, group: asia, lat: 43.0618, lon: 141.3545}
+  - {id: seoul, name: Seoul, name_zh: 首尔, group: asia, lat: 37.5665, lon: 126.9780}
+  - {id: beijing, name: Beijing, name_zh: 北京, group: asia, lat: 39.9042, lon: 116.4074}
+  - {id: changchun, name: Changchun, name_zh: 长春, group: asia, lat: 43.8171, lon: 125.3235}
+  - {id: sydney, name: Sydney, name_zh: 悉尼, group: south, lat: -33.8688, lon: 151.2093}
+  - {id: canberra, name: Canberra, name_zh: 堪培拉, group: south, lat: -35.2809, lon: 149.1300}
+  - {id: melbourne, name: Melbourne, name_zh: 墨尔本, group: south, lat: -37.8136, lon: 144.9631}
+  - {id: christchurch, name: Christchurch, name_zh: 基督城, group: south, lat: -43.5321, lon: 172.6362}
+  - {id: queenstown, name: Queenstown, name_zh: 皇后镇, group: south, lat: -45.0312, lon: 168.6626}
+  - {id: santiago, name: Santiago, name_zh: 圣地亚哥（智利）, group: south, lat: -33.4489, lon: -70.6693}

@@ -25,7 +25,7 @@ export interface ObsDay {
 }
 export interface ObsStation {
   triplet: string; name: string; lat: number; lon: number; elevation_m: number; km: number; dz_m: number;
-  grade: "A" | "B" | "C"; days: ObsDay[];
+  grade: "A" | "B" | "C"; source?: string; days: ObsDay[];
 }
 export interface ObsDoc { schema_version: number; resort_id: string; generated_at: string; source: string; timezone: string; stations: ObsStation[] }
 

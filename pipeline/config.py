@@ -43,7 +43,9 @@ SOURCES = [
     {"name": "UK Met Office (global 10 km)", "url": "https://www.metoffice.gov.uk/", "license": "CC BY-SA 4.0"},
     {"name": "CMA (GRAPES global)", "url": "https://www.cma.gov.cn/", "license": "CMA terms"},
     {"name": "Ensembles: ECMWF ENS, NOAA GEFS, ECCC GEPS, DWD ICON-EPS", "url": "https://open-meteo.com/en/docs/ensemble-api", "license": "CC BY 4.0"},
-    {"name": "OpenStreetMap contributors (resort positions, base map via OpenFreeMap)", "url": "https://www.openstreetmap.org/copyright", "license": "ODbL"},
+    {"name": "USDA NRCS SNOTEL (measured snow, US)", "url": "https://www.nrcs.usda.gov/wps/portal/wcc/home/", "license": "public domain"},
+    {"name": "WSL Institute for Snow and Avalanche Research SLF (IMIS stations, Switzerland)", "url": "https://www.slf.ch", "license": "CC BY 4.0"},
+    {"name": "OpenStreetMap contributors (resort positions, road distances via OSRM, base map via OpenFreeMap)", "url": "https://www.openstreetmap.org/copyright", "license": "ODbL"},
 ]
 
 

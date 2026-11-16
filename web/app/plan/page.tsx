@@ -9,24 +9,29 @@ import {
   type Advice, type PlannerDay, type PlannerResort, LIFTS_CLOSE_H, MIN_SCORE, RANK_MAX_AHEAD,
   addDays, advice, daysBetween, decodePlanner, isWeekend, resortNow, weekday,
 } from "@/lib/planner";
-import { inRegion, regionLabel } from "@/lib/regions";
+import { CITIES, CITY_GROUPS, CLOSURES, DEFAULT_HOURS, FROM_KEY, HOURS, cityById, cityName, fmtDrive, savedCity, useDrive } from "@/lib/drive";
+import { PASS_FILTERS, type PassFilter, onPass, passName } from "@/lib/passes";
+import { inRegion, normalizeArea, regionLabel } from "@/lib/regions";
 import { fmtSnow, fmtThreshold } from "@/lib/units";
 
-type PassFilter = "all" | "ikon" | "epic";
 type When = "next" | "weekend";
 const PAGE = 12;
 const WIND_KMH = 70;
 
 interface Row { r: PlannerResort; d: PlannerDay; ahead: number; adv: Advice }
 
-/** Filters live in the URL so a plan can be shared. */
-function readQuery(): { pass: PassFilter; area: string; when: When } {
+/** Filters live in the URL so a plan can be shared; the home city is also remembered on this device. */
+function readQuery(): { pass: PassFilter; area: string; when: When; from: string; hours: number } {
   const q = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const pass = q.get("pass");
+  const from = q.has("from") ? q.get("from") ?? "" : savedCity();
+  const hours = Number(q.get("hours"));
   return {
-    pass: pass === "ikon" || pass === "epic" ? pass : "all",
-    area: q.get("area") || "all",
+    pass: (PASS_FILTERS as string[]).includes(pass ?? "") ? (pass as PassFilter) : "all",
+    area: normalizeArea(q.get("area")),
     when: q.get("when") === "weekend" ? "weekend" : "next",
+    from: cityById(from) ? from : "",
+    hours: (HOURS as readonly number[]).includes(hours) ? hours : DEFAULT_HOURS,
   };
 }
 
@@ -36,13 +41,15 @@ export default function Plan() {
   const [pass, setPass] = useState<PassFilter>("all");
   const [area, setArea] = useState("all");
   const [when, setWhen] = useState<When>("next");
+  const [from, setFrom] = useState("");
+  const [hours, setHours] = useState<number>(DEFAULT_HOURS);
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const q = readQuery();
-    setPass(q.pass); setArea(q.area); setWhen(q.when); setLoaded(true);
+    setPass(q.pass); setArea(q.area); setWhen(q.when); setFrom(q.from); setHours(q.hours); setLoaded(true);
   }, []);
   useEffect(() => {
     if (!loaded) return;
@@ -50,20 +57,29 @@ export default function Plan() {
     if (pass !== "all") q.set("pass", pass);
     if (area !== "all") q.set("area", area);
     if (when !== "next") q.set("when", when);
+    if (from) q.set("from", from);
+    if (from && hours !== DEFAULT_HOURS) q.set("hours", String(hours));
     const s = q.toString();
     window.history.replaceState(null, "", `${window.location.pathname}${s ? `?${s}` : ""}`);
-  }, [pass, area, when, loaded]);
+    try { if (from) localStorage.setItem(FROM_KEY, from); else localStorage.removeItem(FROM_KEY); } catch { /* private mode */ }
+  }, [pass, area, when, from, hours, loaded]);
+
+  const drive = useDrive(from);
+  const mins = from && drive ? drive.minutes[from] ?? {} : null;
+  const via = from && drive ? drive.via[from] ?? {} : {};
 
   const resorts = useMemo(() => (data ? decodePlanner(data) : []), [data]);
   const picked = useMemo(
-    () => resorts.filter((r) => (pass === "all" || r.passes[pass]) && inRegion(area, r.region)),
-    [resorts, pass, area],
+    () => resorts.filter((r) => onPass(pass, r.id, r.passes) && inRegion(area, r.region)
+      && (!from || (mins !== null && (mins[r.id] ?? Infinity) <= hours * 60))),
+    [resorts, pass, area, from, mins, hours],
   );
 
   // ---- best bets: resort x day, up to RANK_MAX_AHEAD days ahead -----------------------------
-  const { rows, weekendAhead } = useMemo(() => {
+  const { rows, weekendAhead, blockedN } = useMemo(() => {
     const out: Row[] = [];
     let weekendAhead = Infinity;
+    let blockedN = 0;
     for (const r of picked) {
       const now = resortNow(r.timezone);
       for (const d of r.days) {
@@ -74,12 +90,13 @@ export default function Plan() {
           weekendAhead = Math.min(weekendAhead, ahead);
         }
         if (ahead > RANK_MAX_AHEAD || d.score < MIN_SCORE) continue;
+        if (!onPass(pass, r.id, r.passes, d.date)) { blockedN++; continue; }      // a blackout date of the product
         out.push({ r, d, ahead, adv: advice(d, ahead) });
       }
     }
     out.sort((a, b) => b.d.score - a.d.score);
-    return { rows: out, weekendAhead };
-  }, [picked, when]);
+    return { rows: out, weekendAhead, blockedN };
+  }, [picked, when, pass]);
 
   // ---- further out: region x day, best chance of 15 cm+ ------------------------------------
   const further = useMemo(() => {
@@ -91,6 +108,7 @@ export default function Plan() {
         const ahead = daysBetween(today, date);
         if (ahead <= RANK_MAX_AHEAD || p === null) return;
         if (when === "weekend" && !isWeekend(date)) return;
+        if (!onPass(pass, r.id, r.passes, date)) return;
         dates.add(date);
         const m = cells.get(r.region) ?? new Map<string, number>();
         m.set(date, Math.max(m.get(date) ?? 0, p));
@@ -106,7 +124,7 @@ export default function Plan() {
       return m && (area === id || Math.max(...Array.from(m.values())) >= 0.05);
     });
     return { cols, regions: regionOrder, cells };
-  }, [picked, when, data, area]);
+  }, [picked, when, data, area, pass]);
 
   if (!ready) return null;
   const shown = more ? rows.slice(0, 40) : rows.slice(0, PAGE);
@@ -137,17 +155,27 @@ export default function Plan() {
         <button className="chip ml-auto" onClick={share}>{copied ? t("planCopied") : t("planShare")}</button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {(["all", "ikon", "epic"] as PassFilter[]).map((p) => (
+        {PASS_FILTERS.map((p) => (
           <button key={p} className="chip" aria-pressed={pass === p} onClick={() => { setPass(p); setMore(false); }}>
-            {p === "all" ? t("all") : p === "ikon" ? "Ikon" : "Epic"}
+            {p === "all" ? t("all") : passName(p)}
           </button>
         ))}
         <RegionSelect value={area} onChange={(v) => { setArea(v); setMore(false); }} regions={data?.regions ?? []} used={used} />
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-[13px] text-ink-3">{t("planFrom")}</span>
+        <CitySelect value={from} onChange={(v) => { setFrom(v); setMore(false); }} />
+        {from && HOURS.map((h) => (
+          <button key={h} className="chip" aria-pressed={hours === h} onClick={() => { setHours(h); setMore(false); }}>
+            {t("planWithinH").replace("{h}", String(h))}
+          </button>
+        ))}
+      </div>
       <p className="mt-3 text-xs leading-5 text-ink-3">{t("planHint")}</p>
-      <LoadState loading={loading} error={error} />
+      {from && <p className="mt-1 text-xs leading-5 text-ink-3">{t("planDriveHint")}</p>}
+      <LoadState loading={loading || (!!from && !drive)} error={error} />
 
-      {data && (
+      {data && (!from || drive) && (
         <>
           <h2 className="mt-5 text-sm font-semibold">{t("planBest")}</h2>
           {weekendFar ? (
@@ -156,7 +184,9 @@ export default function Plan() {
                 .replace("{d}", firstWeekend ? fmtD(addDays(firstWeekend, -2)) : "–")}
             </p>
           ) : rows.length === 0 ? (
-            <p className="card mt-2 p-4 text-sm text-ink-3">{t("planNone")}</p>
+            <p className="card mt-2 p-4 text-sm text-ink-3">
+              {from ? t("planNoneNear").replace("{c}", cityName(cityById(from)!, lang)).replace("{h}", String(hours)) : t("planNone")}
+            </p>
           ) : (
             <ol className="card mt-2 divide-y divide-line">
               {shown.map(({ r, d, ahead, adv }) => (
@@ -174,6 +204,11 @@ export default function Plan() {
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-3">
                         <span>{regionName(r.region)}</span>
                         <PassBadges passes={r.passes} />
+                        {mins?.[r.id] != null && <span className="num text-ink-2">{t("planDrive").replace("{t}", fmtDrive(mins[r.id], lang))}</span>}
+                        {via[r.id] && (
+                          <span title={t("planDetourHint").replace("{p}", via[r.id].map((c) => CLOSURES[c] ?? c).join(", "))}
+                            className="rounded-md border border-line px-1.5 leading-4 text-ink-2">{t("planDetour")}</span>
+                        )}
                       </div>
                       <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13px] text-ink-2">
                         <span><span className="num font-semibold text-ink">{fmtSnow(d.night, units)}</span> {t("planOvernight")}</span>
@@ -197,6 +232,9 @@ export default function Plan() {
                 </li>
               ))}
             </ol>
+          )}
+          {!weekendFar && blockedN > 0 && pass !== "all" && (
+            <p className="mt-2 text-xs text-ink-3">{t("planBlocked").replace("{n}", String(blockedN)).replace("{p}", passName(pass))}</p>
           )}
           {!weekendFar && !more && rows.length > PAGE && (
             <button className="chip mt-3" onClick={() => setMore(true)}>{t("planShowMore")} ({Math.min(rows.length, 40) - PAGE})</button>
@@ -255,6 +293,25 @@ export default function Plan() {
   );
 }
 
+/** Home city for the drive-time filter, grouped like data/cities.yaml. */
+function CitySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t, lang } = useUser();
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={t("planFrom")}
+      className="h-8 min-w-0 max-w-[13rem] rounded-full border border-line bg-surface px-3 text-[13px] text-ink-2">
+      <option value="">{t("planAnywhere")}</option>
+      {CITY_GROUPS.map((g) => {
+        const cs = CITIES.filter((c) => c.group === g.id).sort((a, b) => cityName(a, lang).localeCompare(cityName(b, lang), lang));
+        return cs.length ? (
+          <optgroup key={g.id} label={lang === "zh" ? g.name_zh : g.name}>
+            {cs.map((c) => <option key={c.id} value={c.id}>{cityName(c, lang)}</option>)}
+          </optgroup>
+        ) : null;
+      })}
+    </select>
+  );
+}
+
 /** Calendar subscription (pipeline/publish/ics.py): one feed per language x pass x area. */
 function CalendarFeed({ pass, area, areaName, six }: { pass: PassFilter; area: string; areaName: string; six: string }) {
   const { t, lang } = useUser();
@@ -264,11 +321,11 @@ function CalendarFeed({ pass, area, areaName, six }: { pass: PassFilter; area: s
   const url = `${base}/ics/${lang}/${pass}/${slug}.ics`;
   const webcal = url.replace(/^https?:/, "webcal:");
   const copy = () => navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  const passName = pass === "all" ? t("all") : pass === "ikon" ? "Ikon" : "Epic";
+  const pn = pass === "all" ? t("all") : passName(pass);
   return (
     <details className="card mt-6 p-4 text-xs leading-5 text-ink-2">
       <summary className="cursor-pointer text-sm font-medium text-ink">{t("planCal")}</summary>
-      <p className="mt-2">{t("planCalText").replace("{f}", `${passName} · ${areaName}`).replace("{t}", six)}</p>
+      <p className="mt-2">{t("planCalText").replace("{f}", `${pn} · ${areaName}`).replace("{t}", six)}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <a className="chip" href={webcal}>{t("planCalApple")}</a>
         <a className="chip" href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcal)}`} target="_blank" rel="noopener noreferrer">{t("planCalGoogle")}</a>

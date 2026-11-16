@@ -58,20 +58,42 @@ Open-Meteo 免费档每天 10,000 次加权调用（10 个变量、14 天各算 
 | `resort/{id}.json` | 逐小时 168h（三个海拔的气温、降雪、降水类型、雪线、0°C 层、山顶风）；逐日：前 10 天点值（夜间 / 白天降雪、集合 10–90% 范围、信心、雪质），第 11–16 天只有集合分位数和概率；第 3–5 周展望；各模型逐日降雪 |
 | `ens/{id}.json` | 集合各成员的滑雪日降雪（未订正的原始值），供下一次运行复用，前端不读 |
 | `planner.json` | "去哪滑"页用的紧凑数据：每个雪场每个滑雪日的粉雪分、开门时新雪、全天降雪和范围、≥2.5 / 15 cm 概率、雪质、阵风、雨（约 280 KB，压缩后约 45 KB）。字段和粉雪分的定义见 `pipeline/publish/planner.py` |
-| `ics/{lang}/{pass}/{area}.ics` | 粉雪日日历订阅（B6）：语言 en / zh × 通行证 all / ikon / epic × 地区（`all`、`g-{组}`、单个大区，组的定义在 `data/region_groups.yaml`）。提前 4 天以内、粉雪分 ≥ 60、≥15 cm 概率 ≥ 60% 的雪场和日子各一个全天日程；UID 固定，预报变差后日程消失。"去哪滑"页按当前筛选给出订阅链接（Apple 日历 / Google 日历 / 复制） |
+| `ics/{lang}/{pass}/{area}.ics` | 粉雪日日历订阅（B6）：语言 en / zh × 通行证 all / ikon / epic / ikon-base / epic-local × 地区（`all`、`g-{组}`、单个大区，组的定义在 `data/region_groups.yaml`）。提前 4 天以内、粉雪分 ≥ 60、≥15 cm 概率 ≥ 60% 的雪场和日子各一个全天日程；UID 固定，预报变差后日程消失。"去哪滑"页按当前筛选给出订阅链接（Apple 日历 / Google 日历 / 复制） |
 | `trend/{id}.json` | 预报趋势（B5）：最近 5 天里最多 12 次预报对每个滑雪日的山腰降雪，从存档读。详情页的全天降雪后面显示"比约一天前那次预报多 / 少多少" |
 | `verification.json` | 评分（A3）：存档的预报对照存档的实测，最近 30 天和本雪季，总体 / 按大区 / 按雪场，按提前 1、2、3、5、7、10 天分别算：降雪和降水的平均绝对误差与偏差、大雪日（≥15 cm）命中和空报、≥15 / 2.5 cm 概率的 Brier 分数、范围覆盖率、各原始模型的误差和相对 NBM 的技巧分。另有最近 30 天每个雪场每天的"实测 vs 提前 1 / 3 天的预报"。定义见 `pipeline/verify/score.py`；页面是 `/accuracy`（成绩单）。存档从 2026-11-15 开始，头几周样本很少 |
-| `obs/{id}.json` | 有 SNOTEL 站的雪场（美国西部 34 个）：附近 1–3 个站最近 14 个滑雪日的实测（夜间 / 全天新雪、降水、雪深、气温、质量标记）。见下面"实测" |
+| `obs/{id}.json` | 有自动站的雪场（美国西部 34 个用 SNOTEL，瑞士及周边 20 个用 SLF IMIS）：附近 1–3 个站最近 14 个滑雪日的实测（夜间 / 全天新雪、降水、雪深、气温、质量标记），每个站标明来源。见下面"实测" |
 
-### 实测（SNOTEL）
+### 实测（SNOTEL、SLF）
 
-`data/stations.yaml` 由 `scripts/match_stations.py` 生成：每个美国雪场 15 公里内的 SNOTEL 站，按和山腰的高差排序，最多 3 个，分级 A（5 公里内、高差 300 米内）/ B（15 公里内、高差 500 米内）/ C（只展示）。现在 34 个美国西部雪场有 A 或 B 级站；Mammoth、June、阿斯彭四个、Snowbasin、Mt. Bachelor 和南加州三个没有，要等加州 CDEC 等其他来源。
+`data/stations.yaml` 由 `scripts/match_stations.py` 生成：每个雪场 15 公里内的测站，按和山腰的高差排序，最多 3 个，分级 A（5 公里内、高差 300 米内）/ B（15 公里内、高差 500 米内）/ C（只展示）。两个来源：
 
-每次运行用 NRCS AWDB 接口（公有领域，免密钥，不占 Open-Meteo 额度）拉这些站最近两周的**逐小时**读数，按和预报相同的滑雪日窗口汇总（`pipeline/verify/obs.py`）：降水用雨量计（7 小时中位数滤波后取单调上升，大风中少测）；新雪用雪深的正增量（5 小时中位数滤波 + 2 英寸死区，只在雨量计有 ≥ 3 mm 时计入），是下限；下雪时雪深反降的日子标 `depth_fell`，评分不用。SNOTEL 的逐小时时间是站点的固定时区（本土 UTC−8、阿拉斯加 UTC−9，不随夏令时变）。拉取失败时保留上一版文件，不影响发布。详情页在逐日预报下面显示"附近实测"。
+- **SNOTEL**（美国，测站编号是 AWDB 的 triplet）：34 个美国西部雪场。Mammoth、June、阿斯彭四个、Snowbasin、Mt. Bachelor 和南加州三个没有，要等加州 CDEC 等其他来源。
+- **SLF IMIS**（瑞士雪与雪崩研究所的自动站，编号 `SLF:<代码>`，CC BY 4.0，页面上必须链接 slf.ch）：14 个瑞士雪场，加上边境附近的霞慕尼两个、Cervinia、Monterosa、Ischgl、Kappl，共 20 个。每 30 分钟的雪深和气温，部分站有 10 分钟降水；没有雨量计的站新雪只按雪深上涨算（不做"雨量计 ≥ 3 mm"的检查）。实时接口最多回溯 7 天（`period_in_days` 只接受 1 / 3 / 7），更早的滑雪日从存档补；存档不会被"没测到"的天覆盖。`pipeline/verify/obs_slf.py`。
+
+两个来源分别拉取，一个失败不影响另一个。
+
+每次运行用 NRCS AWDB 接口（公有领域，免密钥，不占 Open-Meteo 额度）拉 SNOTEL 站最近两周的**逐小时**读数，按和预报相同的滑雪日窗口汇总（`pipeline/verify/obs.py`）：降水用雨量计（7 小时中位数滤波后取单调上升，大风中少测）；新雪用雪深的正增量（5 小时中位数滤波 + 2 英寸死区，只在雨量计有 ≥ 3 mm 时计入），是下限；下雪时雪深反降的日子标 `depth_fell`，评分不用。SNOTEL 的逐小时时间是站点的固定时区（本土 UTC−8、阿拉斯加 UTC−9，不随夏令时变）。拉取失败时保留上一版文件，不影响发布。详情页在逐日预报下面显示"附近实测"。
 
 ### 预报存档
 
 每次运行把**本次重新计算的**雪场预报逐日写成一行，存到本仓库的孤立分支 [`archive`](https://github.com/TokenFlyAI/snow/tree/archive)：`forecasts/YYYY/MM/DD/HHMMZ.jsonl.gz`（约 240 KB/天）；实测的滑雪日存在 `obs/YYYY/MM/YYYY-MM-DD.jsonl.gz`（最近两周每次重写，测站会回头修正读数）。workflow 在跑管道前先把这个分支解压到 `archive/`，管道追加本次的文件并据此评分，发布后再推回去。用来以后对照实测评分、校准范围和概率；线上算法以 `method: "v2"` 冻结为基线。行格式和读取函数在 `pipeline/verify/archive.py`，推送由 `scripts/push_archive.sh` 完成；存档失败不影响发布。
+
+### 通行证产品（B2）
+
+`data/resorts.yaml` 的 `passes` 只有最高档（Ikon Pass、Epic Pass）。低一档的 Ikon Base 和 Epic Local 在 `data/pass_products.yaml`：每个雪场几天（不限 / 5 天 / 和其他山合计 10 天 / 连续 5 天）和限制日期（Ikon Base：12/26–30、1/16–17、2/13–14；Epic Local 的高峰日：11/27–28、12/26–31、1/16、2/13–14，Verbier 另加 2/6–20）。数据从两家官网的 2026-27 页面抄录（2026-11-15），每年秋天要重新核对；`tests/test_pass_products.py` 检查每个雪场都在对应的最高档通行证上、多山头目的地整体进出。
+
+"去哪滑"页可以按这两种通行证筛选，限制日期当天的粉雪日不列出（列表下面说明有几个）；日历订阅也有这两种；详情页在通行证标签下面列出各产品的天数和限制日期。
+
+### 车程
+
+"去哪滑"页可以选出发城市和最长车程（2 / 3 / 4 / 6 / 8 小时）。车程表是一次性生成、提交在仓库里的静态文件 `data/drive.json`（`python scripts/build_drive_table.py`，约 15 分钟，响应缓存在 `.cache/osrm/`）：
+
+- 出发城市在 `data/cities.yaml`（60 个），雪场是直线 700 公里以内的全部；超过 9 小时的不收。
+- 路网里程来自公开的 OSRM 服务（OpenStreetMap 路网）。时间用我们自己的换算：`10 分钟 + 里程 ÷ 94 km/h`。用 22 条已知车程的路线校准，平均误差 17 分钟、最差 47 分钟（慢的山路）；OSRM 自己的时间更差（这台公共服务上高速公路慢了最多七成），直线估算的误差中位数是 1 小时。
+- 冬季封路：`data/winter_closures.yaml` 手工列出冬天封闭的山口（Tioga、Sonora、Independence、Furka、Oberalp、Albula、Timmelsjoch 等 38 个）和各自的绕行点。路线经过山口（0.5 公里内；山口下有隧道的大圣伯纳德和哥达是 0.2 公里）就改走经过绕行点、又不经过任何封闭山口的最短路线，页面标"冬季绕行"。离山口 2 公里内的路线会打印出来人工复核。
+- 汽车火车（Lötschberg、Furka、Vereina）可以走，每段加 20 分钟；需要真正轮渡的路线不收。
+- 终点是雪场坐标（雪道区域中心）吸附到的最近公路；吸附到错误道路的雪场在 `data/drive_targets.yaml` 里改成山脚停车场（Deer Valley、Zermatt 的 Täsch、Whistler、Sunshine、Grouse）。详情页的"导航"链接用同一个终点。
+- 不含堵车、天气和链条管制。
 
 数据格式版本是 `schema_version: 2`（字段说明见 `docs/phase2-handoff.md` §2.6 和 `web/lib/types.ts`）。
 
@@ -158,8 +180,10 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 - [Open-Meteo](https://open-meteo.com/)（CC BY 4.0）：ECMWF IFS / AIFS、NOAA GFS / NBM / HRRR / RRFS、DWD ICON、加拿大 GEM / HRDPS、JMA、Météo-France AROME / ARPEGE、MeteoSwiss ICON-CH、英国气象局全球模型、CMA GRAPES；集合预报 ECMWF ENS、GEFS、GEPS、ICON-EPS。免费档仅限非商用：600 次/分钟、5,000 次/小时、10,000 次/天；超过 10 个变量或 14 天按比例多计，集合的每个成员算一个变量。
 - 底图：[OpenFreeMap](https://openfreemap.org/)（免密钥），© OpenStreetMap 贡献者。
 - 实测与回测：[USDA NRCS SNOTEL](https://www.nrcs.usda.gov/wps/portal/wcc/home/)，AWDB REST API（公有领域）。
+- 瑞士及周边的实测：[WSL 雪与雪崩研究所 SLF](https://www.slf.ch) 的 IMIS 自动站，measurement-api.slf.ch（CC BY 4.0）。
 - 雪场坐标与索道：© OpenStreetMap 贡献者（ODbL），经 Overpass API；海拔：维基百科与雪场官网，用 Mapzen 地形数据（经 Open Topo Data）核对。
 - 雪场名单：ikonpass.com 与 epicpass.com 的 2026-27 通行证页面（2026-11-11 核对）。
+- 车程：路网里程 © OpenStreetMap 贡献者（ODbL），经 [OSRM](https://project-osrm.org/) 公共服务；时间是我们自己的换算。
 
 页面的「数据与方法」页会显示每次运行的模型状态和来源。
 
@@ -170,8 +194,9 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
 - 集合预报只有山腰一个海拔；山脚 / 山顶的分位数按融合里的海拔比例缩放。订正系数是"让集合平均等于融合"，不是用实测校准的；范围和概率的校准（A7）要等存档积累一个月（约 2026-12 中）。
 - standard 档的雪场一天只更新一次，集合只有 GEFS（31 个成员），范围比 featured 雪场粗。
 - 回测（美国西部 29 个 SNOTEL 站、两个雪季）：模型间范围只覆盖 34%–48% 的实际降水，集合范围的覆盖率要等存档积累（`/accuracy` 页会显示）；雪水比用 SNOTEL 验证不了，是降雪英寸数最大的误差来源。
-- 实测只有美国西部 34 个有 SNOTEL 站的雪场。测站的新雪是下限（新雪会压实、风会吹走），雨量计在大风中少测；美国东部、加拿大、欧洲、日本还没有实测来源。
+- 实测只有美国西部 34 个（SNOTEL）和瑞士及周边 20 个（SLF）雪场。测站的新雪是下限（新雪会压实、风会吹走），雨量计在大风中少测；没有雨量计的 SLF 站只有雪深。美国东部、加拿大、奥地利、法国、意大利、日本还没有实测来源（日本 AMeDAS 的站都在山下村镇，高差太大，只能算 C 级）。
 - "去哪滑"页的概率是集合预报自己的，还没用实测校准；粉雪分的系数是初始值。
+- 车程是按里程换算的估计（平均误差约 17 分钟），终点是雪场雪道区域中心最近的公路，不一定是停车场；冬季封路清单是手工维护的，临时封路（雪崩、暴风雪）不在里面。
 - 46 个雪场标了 `needs_review`（坐标或海拔来源不一致、靠猜），清单见 `docs/phase2-handoff.md` §5。
 - Open-Meteo 文档显示 HRRR、ICON Global 等标有停用日期（未能二次确认）；模型缺数据时会被自动剔除并在页面标注。
 
@@ -183,12 +208,13 @@ PWA 的 manifest 和 service worker 的 scope 都是 `/snow/`：页面走网络�
    - ✅ standard 档加 ICON、GEM；跳过的定时运行由下一次补上
    - ✅ 预报存档（`archive` 分支）
    - ✅ `planner.json` + 粉雪分；"去哪滑"页（未来 5 天排雪场，更远只排日子和地区；可分享链接）
-   - ✅ SNOTEL 实测接入（美国西部 34 个雪场，详情页"附近实测"）
+   - ✅ SNOTEL 实测接入（美国西部 34 个雪场，详情页"附近实测"）；SLF IMIS（瑞士及周边 20 个雪场）
    - ✅ 评分（`verification.json`，每次运行滚动更新；样本要积累几周）和成绩单页 `/accuracy`（误差随提前量、对比 NBM / ECMWF / GFS、概率可靠性、逐日预报对比实测、复算链接）
    - ✅ ECMWF 换成 9 公里版本（廓线取 0.25°）
    - 范围和概率校准（等存档积累一个月）→ 总量偏差订正 → 准确率页面
    - ✅ 日历订阅提醒（`.ics`，不需要账号）
    - ✅ 预报趋势：每个滑雪日"比昨天的预报多 / 少多少"
-   - 通行证分产品与限制日期、路网车程表
+   - ✅ 出发城市 + 车程筛选（路网里程，冬季封闭山口绕行）；详情页显示车程和导航链接
+   - ✅ 通行证分产品（Ikon Base、Epic Local）与限制日期
 4. Claude 每日雪报（中 / 英，结构化 JSON + 数值校验，读 NWS AFD）
 5. 登录与跨设备同步（Supabase）、邮件粉雪警报、月 / 季展望、数据迁移到 Cloudflare R2

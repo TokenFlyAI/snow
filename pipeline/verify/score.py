@@ -237,7 +237,7 @@ def build_verification(root: Path | str, region_of: dict[str, str], now: datetim
         "schema_version": SCHEMA_VERSION,
         "generated_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "method": METHOD,
-        "observations": "USDA NRCS SNOTEL, best grade A/B station per resort (data/stations.yaml)",
+        "observations": "USDA NRCS SNOTEL (US) and SLF IMIS (Switzerland and nearby), best grade A/B station per resort (data/stations.yaml)",
         "units": {"snow": "cm", "precip": "mm"},
         "leads": list(REPORT_LEADS),
         "notes": "Observed new snow is a lower bound (settling), gauge precipitation under-catches in wind. "

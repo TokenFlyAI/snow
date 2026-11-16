@@ -23,7 +23,7 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -36,7 +36,7 @@ from .ingest.open_meteo_ensemble import EnsembleData, fetch_ensemble
 from .process.derive import derive, make_donor
 from .process.ensemble import raw_document
 from .publish.build import build_index, build_manifest, build_resort, split_daily
-from .publish.obs_docs import build_obs_docs
+from .publish.obs_docs import OBS_DAYS, build_obs_docs
 from .publish.ics import write_feeds
 from .publish.planner import build_planner
 from .publish.trend import build_trends
@@ -318,8 +318,15 @@ def publish_obs(out_dir: Path, resorts: list[Resort], stations: dict[str, list[d
     """obs/{id}.json for resorts with stations; on failure the previous files are kept. Never fails the run.
     With archive_dir the completed observed days also go to the archive (for scoring)."""
     wanted = [r for r in resorts if stations.get(r.id)]
+    past = {}
+    if archive_dir is not None:                 # days the live source no longer serves (SLF: 7 days)
+        try:
+            since = (now - timedelta(days=OBS_DAYS + 1)).date()
+            past = {(r["resort_id"], r["station"], r["target_date"]): r for r in archive.read_obs(archive_dir, since)}
+        except Exception as e:  # noqa: BLE001
+            log.warning("archived observations not read: %s", e)
     try:
-        docs = build_obs_docs(wanted, stations, now, fetch)
+        docs = build_obs_docs(wanted, stations, now, fetch, past)
         status = "ok"
     except Exception as e:  # noqa: BLE001  observations are an extra: never stop a publish
         log.warning("observations not refreshed (%s): keeping the previous files", e)

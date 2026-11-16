@@ -1,13 +1,14 @@
 """Calendar feeds of powder days (design doc B6): alerts without an account or a backend.
 
-    ics/{lang}/{pass}/{area}.ics     lang: en | zh; pass: all | ikon | epic;
+    ics/{lang}/{pass}/{area}.ics     lang: en | zh; pass: all | ikon | epic | ikon-base | epic-local;
                                      area: all | g-{group} (data/region_groups.yaml) | {region}
 
 One all-day event per (resort, ski day) that is a likely powder day: at most 4 days ahead (the
 planner backtest: picking a mountain further out does not pay off), powder score >= 60 and a
 >= 60 % chance of 15 cm (6 in) or more. Calendar apps re-read a subscribed feed every few hours;
 an event whose forecast drops below the bar disappears, one that changes keeps its UID.
-The data is planner.json (pipeline/publish/planner.py).
+The data is planner.json (pipeline/publish/planner.py). The Ikon Base and Epic Local feeds leave out
+the resorts not on that product and the product's blackout dates (data/pass_products.yaml).
 """
 from __future__ import annotations
 
@@ -18,13 +19,16 @@ from zoneinfo import ZoneInfo
 
 import yaml
 
+from ..passes import access, blocked, load_products
+
 MIN_SCORE = 60
 MIN_P15 = 0.6
 MAX_AHEAD = 4
 LIFTS_CLOSE_H = 16
 SITE = "https://tokenfly.ai/snow"
 GROUPS_FILE = Path(__file__).resolve().parents[2] / "data" / "region_groups.yaml"
-PASSES = ("all", "ikon", "epic")
+PASSES = ("all", "ikon", "epic", "ikon-base", "epic-local")
+PASS_NAMES = {"ikon": "Ikon", "epic": "Epic", "ikon-base": "Ikon Base", "epic-local": "Epic Local"}
 LANGS = ("en", "zh")
 
 
@@ -137,21 +141,32 @@ def calendar(lang: str, title: str, events: list[tuple[str, dict, dict]], now: d
     return "\r\n".join(fold(x) for x in lines) + "\r\n"
 
 
-def write_feeds(out_dir: Path, planner: dict, now: datetime, groups: Optional[list[dict]] = None) -> int:
+def on_pass(pas: str, rid: str, meta: dict, day: str, products: dict) -> bool:
+    if pas == "all":
+        return True
+    if pas in products:
+        acc = products[pas].get(rid)
+        return acc is not None and not blocked(acc, day)
+    return bool(meta["passes"].get(pas))
+
+
+def write_feeds(out_dir: Path, planner: dict, now: datetime, groups: Optional[list[dict]] = None,
+                products: Optional[dict] = None) -> int:
     """Write every feed; returns the number of files."""
     groups = load_groups() if groups is None else groups
+    products = access(load_products()) if products is None else products
     region_names = {r["id"]: r for r in planner.get("regions") or []}
     group_names = {f"g-{g['id']}": g for g in groups}
     days = powder_days(planner, now)
     n = 0
     for slug, regions in areas(region_names, groups).items():
         for pas in PASSES:
-            evs = [e for e in days if e[1]["region"] in regions and (pas == "all" or e[1]["passes"].get(pas))]
+            evs = [e for e in days if e[1]["region"] in regions and on_pass(pas, e[0], e[1], e[2]["date"], products)]
             for lang in LANGS:
                 named = group_names.get(slug) or region_names.get(slug)
                 area = ("全部地区" if lang == "zh" else "All areas") if slug == "all" else \
                     (named.get("name_zh") or named["name"]) if lang == "zh" else named["name"]
-                pass_name = {"all": "全部雪场" if lang == "zh" else "All resorts", "ikon": "Ikon", "epic": "Epic"}[pas]
+                pass_name = ("全部雪场" if lang == "zh" else "All resorts") if pas == "all" else PASS_NAMES[pas]
                 title = f"{'粉雪日' if lang == 'zh' else 'Powder days'} · {pass_name} · {area}"
                 p = out_dir / "ics" / lang / pas / f"{slug}.ics"
                 p.parent.mkdir(parents=True, exist_ok=True)

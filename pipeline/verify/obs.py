@@ -211,6 +211,12 @@ def ski_days(series: HourlySeries, tz: str, dates: list[date], now: datetime) ->
     return out
 
 
+def unusable(day: dict) -> bool:
+    """A ski day (ObsDay.as_dict()) with nothing measured: no data, or no precipitation and no depth."""
+    flags = day.get("flags") or []
+    return "no_data" in flags or "gaps" in flags
+
+
 # ---- station list -------------------------------------------------------------------------------
 
 def load_stations(path: Path | str) -> dict[str, list[dict]]:

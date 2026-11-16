@@ -44,11 +44,16 @@ def test_which_days_become_events():
 def test_feeds_per_language_pass_and_area(tmp_path):
     groups = [{"id": "us-west", "name": "US West", "name_zh": "美国西部", "regions": ["tahoe", "utah"]}]
     assert set(areas(["tahoe", "alps-fr"], groups)) == {"all", "g-us-west", "tahoe", "alps-fr"}
-    n = write_feeds(tmp_path, planner(), NOW, groups)
-    assert n == 2 * 3 * 4
+    products = {"ikon-base": {}, "epic-local": {"kirkwood": {"days": "unlimited", "shared": False, "consecutive": False,
+                                                             "blackout": [["2026-01-13", "2026-01-13"]]}}}
+    n = write_feeds(tmp_path, planner(), NOW, groups, products)
+    assert n == 2 * 5 * 4
     epic_west = (tmp_path / "ics/en/epic/g-us-west.ics").read_text()
     assert epic_west.count("BEGIN:VEVENT") == 2 and "Kirkwood" in epic_west and "Tignes" not in epic_west
     assert "BEGIN:VEVENT" not in (tmp_path / "ics/en/ikon/tahoe.ics").read_text()      # empty feeds still exist
+    local = (tmp_path / "ics/en/epic-local/all.ics").read_text()          # Jan 13 is a blackout date
+    assert local.count("BEGIN:VEVENT") == 1 and "Epic Local" in local and "20260113" not in local
+    assert "BEGIN:VEVENT" not in (tmp_path / "ics/en/ikon-base/all.ics").read_text()
     zh = (tmp_path / "ics/zh/ikon/alps-fr.ics").read_text()
     assert "粉雪日 · Ikon · 法国阿尔卑斯" in zh and "缆车可能停" in zh
 

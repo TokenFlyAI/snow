@@ -9,7 +9,7 @@ import { fmtHeight, fmtPrecip, fmtSnow, fmtTemp } from "@/lib/units";
 
 const SHOW_DAYS = 7;
 
-/** What the nearby SNOTEL stations measured over the last week (obs/{id}.json). Renders nothing without a station. */
+/** What the nearby stations (SNOTEL, SLF IMIS) measured over the last two weeks (obs/{id}.json). Renders nothing without a station. */
 export function Measured({ id, hasObs }: { id: string; hasObs: boolean }) {
   const { t, lang, units } = useUser();
   const { data } = useObs(hasObs ? id : null);
@@ -59,7 +59,11 @@ export function Measured({ id, hasObs }: { id: string; hasObs: boolean }) {
         </table>
       </div>
       <p className="mt-3 text-xs leading-5 text-ink-3">
-        {t("measuredSource")} · {t("updated")} {fmtUpdated(data.generated_at, lang)}
+        {t("measuredSource")}
+        {st.triplet.startsWith("SLF:")
+          ? <a href="https://www.slf.ch" target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4">{t("srcSlf")}</a>
+          : <a href="https://www.nrcs.usda.gov/wps/portal/wcc/home/" target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4">{t("srcSnotel")}</a>}
+        {" · "}{t("updated")} {fmtUpdated(data.generated_at, lang)}
         {days.some(fell) && <> · –* {t("measuredDepthFell")}</>}
       </p>
       <Link href="/accuracy/" className="mt-2 inline-block text-sm text-ink-2 underline decoration-line underline-offset-4">{t("accLink")}</Link>

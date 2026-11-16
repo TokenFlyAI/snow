@@ -5,7 +5,9 @@ import { DailyChart } from "@/components/charts/DailyChart";
 import { HourlyCharts } from "@/components/charts/HourlyCharts";
 import { ModelChart } from "@/components/charts/ModelChart";
 import { OutlookWeeks, ProbDays } from "@/components/Outlook";
+import { DriveLine } from "@/components/DriveLine";
 import { Measured } from "@/components/Measured";
+import { PassProducts } from "@/components/PassProducts";
 import { useUser } from "@/components/Providers";
 import { trendChange, useResort, useTrend } from "@/lib/data";
 import { fmtDate, fmtProb, fmtUpdated } from "@/lib/i18n";
@@ -59,9 +61,11 @@ export default function ResortClient({ id }: { id: string }) {
             <span>{region ? (lang === "zh" ? region.name_zh : region.name) : meta.region}</span>
             <PassBadges passes={meta.passes} />
           </div>
+          <PassProducts id={id} passes={meta.passes} />
           <p className="num mt-1.5 text-xs text-ink-2">
             {t("base")} {fmtHeight(meta.elevation_m.base, units, true)} · {t("mid")} {fmtHeight(meta.elevation_m.mid, units, true)} · {t("summit")} {fmtHeight(meta.elevation_m.summit, units, true)}
           </p>
+          <DriveLine id={id} lat={meta.lat} lon={meta.lon} />
           {meta.needs_review && <p className="mt-1 text-xs text-ink-3">⚠ {t("needsReview")}</p>}
           {data && <p className="mt-1 text-xs text-ink-3">{t(data.resort.tier === "featured" ? "tierFeatured" : "tierStandard")}</p>}
         </div>

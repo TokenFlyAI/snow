@@ -5,11 +5,11 @@ import { LevelPicker, LoadState, PassBadges, RegionSelect, resortName, Updated }
 import { useUser } from "@/components/Providers";
 import { useIndex } from "@/lib/data";
 import type { WindowKey } from "@/lib/types";
+import { PASS_FILTERS, type PassFilter, onPass, passName } from "@/lib/passes";
 import { inRegion } from "@/lib/regions";
 import { fmtSnow } from "@/lib/units";
 import { WINDOWS, windowValue } from "@/lib/windows";
 
-type PassFilter = "all" | "ikon" | "epic";
 const PAGE = 40;
 
 export default function Rank() {
@@ -23,7 +23,7 @@ export default function Rank() {
   const rows = useMemo(() => {
     if (!data) return [];
     return data.resorts
-      .filter((r) => (pass === "all" || r.passes[pass]) && inRegion(region, r.region))
+      .filter((r) => onPass(pass, r.id, r.passes) && inRegion(region, r.region))
       .map((r) => ({ r, v: windowValue(r, win, level) }))
       .sort((a, b) => b.v.cm - a.v.cm);
   }, [data, win, pass, region, level]);
@@ -49,8 +49,8 @@ export default function Rank() {
         <LevelPicker />
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {(["all", "ikon", "epic"] as PassFilter[]).map((p) => (
-          <button key={p} className="chip" aria-pressed={pass === p} onClick={() => setPass(p)}>{p === "all" ? t("all") : p === "ikon" ? "Ikon" : "Epic"}</button>
+        {PASS_FILTERS.map((p) => (
+          <button key={p} className="chip" aria-pressed={pass === p} onClick={() => setPass(p)}>{p === "all" ? t("all") : passName(p)}</button>
         ))}
         <RegionSelect value={region} onChange={(v) => { setRegion(v); setAll(false); }} regions={data?.regions ?? []} used={used} />
       </div>

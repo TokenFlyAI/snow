@@ -1,0 +1,83 @@
+# Lower-tier 2026-27 pass products (design doc B2): which resorts, how many days, which dates are
+# blacked out. data/resorts.yaml `passes` holds the top tier (Ikon Pass, Epic Pass); a resort of
+# that pass that is not listed under a product is not on the product.
+# Read from the official pages on 2026-11-15; check them again every autumn:
+#   https://www.ikonpass.com/en/shop-passes/ikon-base-pass
+#   https://www.epicpass.com/passes/epic-local-pass.aspx
+#
+# access entries:
+#   days        unlimited | number of days (per destination, or shared by the listed resorts)
+#   shared      the days are a total across all resorts of the entry
+#   blackout    the product's blackout dates apply
+#   extra       more blacked-out date ranges for these resorts only
+#   consecutive the days must be taken in a row
+products:
+  - id: ikon-base
+    pass: ikon
+    name: Ikon Base
+    blackout:
+      - [2026-12-26, 2026-12-30]
+      - [2027-01-16, 2027-01-17]
+      - [2027-02-13, 2027-02-14]
+    access:
+      - days: unlimited
+        blackout: true
+        resorts: [arapahoe-basin, bear-mountain, snow-summit, blue-mountain-on, copper-mountain, eldora, june-mountain,
+                  mammoth, palisades-tahoe, snow-valley, snowshoe, solitude, stratton, sugarbush, tremblant, winter-park]
+      - days: 5
+        blackout: true
+        resorts: [
+          # Rockies (Aspen Snowmass: Snowmass only)
+          snowmass, big-sky, brighton, deer-valley, snowbird, steamboat, taos,
+          # West / Pacific NW
+          alyeska, crystal-mountain, mt-bachelor, schweitzer, sierra-at-tahoe, summit-at-snoqualmie, alpental,
+          # Midwest / East
+          blue-mountain-pa, boyne-mountain, camelback, granite-peak, killington, pico, loon, lutsen, snowriver,
+          sugarloaf, sunday-river, the-highlands,
+          # Canada
+          cypress-mountain, le-massif, panorama, red-mountain, revelstoke, silverstar, banff-sunshine, lake-louise,
+          mt-norquay, sun-peaks,
+          # Europe
+          chamonix-brevent-flegere, chamonix-grands-montets, chamonix-balme, chamonix-les-houches,
+          cortina, kronplatz, alta-badia, val-gardena, val-di-fassa, arabba-marmolada, tre-cime, val-di-fiemme,
+          san-martino, plose-gitschberg, alpe-lusia-san-pellegrino, civetta,
+          grandvalira, pal-arinsal, ordino-arcalis, ischgl, kappl, see, galtuer, kitzbuehel, megeve,
+          st-moritz-corviglia, corvatsch, diavolezza-lagalb, courmayeur, cervinia, la-thuile, pila, monterosa-ski,
+          zermatt,
+          # Oceania, Asia, South America
+          coronet-peak, the-remarkables, mt-hutt, mt-buller, thredbo,
+          appi, arai, beidahu, furano, lake-songhua, madarao, yongpyong, mt-t, myoko-suginohara, nekoma,
+          niseko-hirafu, hanazono, niseko-village, annupuri, shiga-kogen, yunding, zao, valle-nevado]
+
+  - id: epic-local
+    pass: epic
+    name: Epic Local
+    blackout:                     # "restricted peak dates"
+      - [2026-11-27, 2026-11-28]
+      - [2026-12-26, 2026-12-31]
+      - [2027-01-16, 2027-01-16]
+      - [2027-02-13, 2027-02-14]
+    access:
+      - days: unlimited
+        resorts: [breckenridge, keystone, crested-butte, stevens-pass, mount-snow, okemo, mount-sunapee, attitash,
+                  wildcat, crotched, hunter, liberty, roundtop, whitetail, jack-frost, big-boulder, seven-springs,
+                  laurel-mountain, hidden-valley-pa, afton-alps, mt-brighton, wilmot, alpine-valley-oh, boston-mills,
+                  brandywine, mad-river-mountain, hidden-valley-mo, snow-creek, paoli-peaks]
+      - days: unlimited
+        blackout: true
+        resorts: [park-city, heavenly, northstar, kirkwood, stowe]
+      - days: 10
+        shared: true
+        blackout: true
+        resorts: [vail, beaver-creek, whistler-blackcomb]
+      - days: 5
+        resorts: [andermatt, sedrun, disentis, crans-montana]
+      - days: 5
+        blackout: true
+        extra: [[2027-02-06, 2027-02-20]]
+        consecutive: true
+        resorts: [verbier, la-tzoumaz, nendaz, veysonnaz, thyon, bruson]
+      - days: 5
+        consecutive: true
+        resorts: [happo-one, hakuba-goryu, hakuba47, hakuba-iwatake, tsugaike, hakuba-norikura, hakuba-cortina,
+                  hakuba-sanosaka, kashimayari, jiigatake, rusutsu]

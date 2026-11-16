@@ -35,6 +35,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
+from .obs import unusable
+
 METHOD = "v2"
 POINT_FIELDS = ("snow_cm", "snow_night_cm", "snow_low_cm", "snow_high_cm", "precip_mm", "rain_base_mm", "slr",
                 "quality", "snow_level_m", "freezing_level_m", "temp_max_c", "temp_min_c", "gust_max_kmh",
@@ -124,7 +126,9 @@ def write_obs(root: Path | str, obs_docs: Iterable[dict]) -> list[Path]:
     for d in obs_docs:
         for rank, st in enumerate(d.get("stations") or []):
             for day in st.get("days") or []:
-                if not day.get("complete"):
+                # an incomplete day, or one the station had nothing for this time (e.g. older than SLF's
+                # 7-day live window), must not replace what is already archived for it
+                if not day.get("complete") or unusable(day):
                     continue
                 row = {"target_date": day["date"], "resort_id": d["resort_id"], "station": st["triplet"],
                        "grade": st.get("grade"), "rank": rank}

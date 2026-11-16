@@ -1,0 +1,87 @@
+# Mountain roads that are closed all winter (roughly Nov - May), hand-maintained.
+# scripts/build_drive_table.py checks every route for a point within radius_km of a closure;
+# such a route is replaced by the shortest route through one of the detour points (a town or an
+# open pass on the winter route) that avoids every closure. Coordinates: the pass summit.
+# Passes that are kept open (Donner, Echo, Carson, Teton, Monarch, Julier, Maloja, Brenner, the
+# Dolomite passes, Envalira, ...) are not listed.
+detours:
+  donner: [39.3166, -120.3266]          # I-80
+  echo-summit: [38.8124, -120.0300]     # US-50
+  carson-pass: [38.6947, -119.9894]     # CA-88
+  tehachapi: [35.1362, -118.4483]       # CA-58
+  glenwood-springs: [39.5505, -107.3248]
+  monarch-pass: [38.4966, -106.3253]    # US-50
+  enumclaw: [47.2043, -121.9915]
+  santiam-pass: [44.4250, -121.8540]    # US-20
+  morrisville-vt: [44.5617, -72.5984]
+  cottonwood-heights: [40.6197, -111.8102]
+  parleys-summit: [40.7547, -111.6239]     # I-80
+  park-city-town: [40.6461, -111.4980]
+  snoqualmie-pass: [47.4245, -121.4137]    # I-90
+  chamonix: [45.9237, 6.8694]           # Mont Blanc tunnel
+  modane: [45.2000, 6.6700]             # Frejus tunnel
+  albertville: [45.6755, 6.3925]
+  chambery: [45.5646, 5.9178]
+  lausanne: [46.5197, 6.6323]
+  kandersteg: [46.4950, 7.6740]         # Loetschberg car train
+  simplon: [46.2500, 8.0300]
+  goeschenen: [46.6656, 8.5876]         # Gotthard road tunnel
+  lucerne: [47.0502, 8.3093]
+  chur: [46.8508, 9.5320]
+  julier: [46.4719, 9.7272]
+  lukmanier: [46.5636, 8.8019]
+  landeck: [47.1400, 10.5650]
+  st-anton: [47.1290, 10.2680]          # Arlberg
+  reutte: [47.4850, 10.7190]
+  brenner: [47.0050, 11.5060]
+  reschen: [46.8340, 10.5080]
+  matrei-osttirol: [47.0000, 12.5400]   # Felbertauern tunnel
+  bolzano: [46.4983, 11.3548]
+  brixen: [46.7150, 11.6570]
+  ora: [46.3470, 11.2990]
+  livigno: [46.5380, 10.1350]
+  aprica: [46.1540, 10.1500]
+
+closures:
+  # US
+  - {id: tioga, name: "Tioga Pass (CA-120)", lat: 37.9108, lon: -119.2577, detours: [donner, echo-summit, carson-pass, tehachapi]}
+  - {id: sonora, name: "Sonora Pass (CA-108)", lat: 38.3283, lon: -119.6367, detours: [donner, echo-summit, carson-pass, tehachapi]}
+  - {id: ebbetts, name: "Ebbetts Pass (CA-4)", lat: 38.5440, lon: -119.8125, detours: [carson-pass, echo-summit, donner]}
+  - {id: monitor, name: "Monitor Pass (CA-89)", lat: 38.6703, lon: -119.6136, detours: [carson-pass, echo-summit, donner]}
+  - {id: independence, name: "Independence Pass (CO-82)", lat: 39.1086, lon: -106.5644, detours: [glenwood-springs]}
+  - {id: cottonwood-co, name: "Cottonwood Pass (CO-306)", lat: 38.8278, lon: -106.4094, detours: [monarch-pass, glenwood-springs]}
+  - {id: kebler, name: "Kebler Pass", lat: 38.8497, lon: -107.0997, detours: [monarch-pass, glenwood-springs]}
+  - {id: guardsman, name: "Guardsman Pass (UT)", lat: 40.6085, lon: -111.5530, detours: [cottonwood-heights, parleys-summit, park-city-town]}
+  - {id: cayuse, name: "Cayuse Pass (SR-123)", lat: 46.8679, lon: -121.5345, detours: [enumclaw, snoqualmie-pass]}
+  - {id: chinook, name: "Chinook Pass (SR-410)", lat: 46.8722, lon: -121.5167, detours: [enumclaw, snoqualmie-pass]}
+  - {id: mckenzie, name: "McKenzie Pass (OR-242)", lat: 44.2595, lon: -121.8043, detours: [santiam-pass]}
+  - {id: smugglers-notch, name: "Smugglers' Notch (VT-108)", lat: 44.5585, lon: -72.7942, detours: [morrisville-vt]}
+  # France / Italy
+  - {id: petit-st-bernard, name: "Col du Petit-Saint-Bernard", lat: 45.6806, lon: 6.8836, detours: [chamonix, modane]}
+  - {id: mont-cenis, name: "Col du Mont-Cenis", lat: 45.2597, lon: 6.9000, detours: [modane]}
+  - {id: galibier, name: "Col du Galibier", lat: 45.0640, lon: 6.4078, detours: [chambery, albertville]}
+  - {id: madeleine, name: "Col de la Madeleine", lat: 45.4348, lon: 6.3769, detours: [albertville, chambery]}
+  - {id: croix-de-fer, name: "Col de la Croix de Fer", lat: 45.2265, lon: 6.2033, detours: [chambery, albertville]}
+  - {id: glandon, name: "Col du Glandon", lat: 45.2400, lon: 6.1770, detours: [chambery, albertville]}
+  - {id: roselend, name: "Cormet de Roselend", lat: 45.6936, lon: 6.6233, detours: [albertville]}
+  # Switzerland
+  - {id: grimsel, name: "Grimsel Pass", lat: 46.5613, lon: 8.3378, detours: [lausanne, kandersteg, simplon, goeschenen]}
+  - {id: furka, name: "Furka Pass", lat: 46.5726, lon: 8.4150, detours: [lausanne, kandersteg, goeschenen, lucerne, chur]}
+  - {id: susten, name: "Susten Pass", lat: 46.7300, lon: 8.4477, detours: [goeschenen, lausanne, kandersteg]}
+  - {id: nufenen, name: "Nufenen Pass", lat: 46.4776, lon: 8.3874, detours: [simplon, lausanne, goeschenen]}
+  - {id: oberalp, name: "Oberalp Pass", lat: 46.6589, lon: 8.6714, detours: [chur, lukmanier, goeschenen, lucerne]}
+  - {id: klausen, name: "Klausen Pass", lat: 46.8689, lon: 8.8547, detours: [chur, goeschenen]}
+  - {id: albula, name: "Albula Pass", lat: 46.5803, lon: 9.8381, detours: [julier]}
+  - {id: splugen, name: "Splugen Pass", lat: 46.5059, lon: 9.3304, detours: [julier, chur]}
+  - {id: gotthard-pass, name: "Gotthard Pass (road over the top)", lat: 46.5590, lon: 8.5617, radius_km: 0.2, detours: [goeschenen]}
+  - {id: great-st-bernard, name: "Great St Bernard Pass (road over the top)", lat: 45.8686, lon: 7.1706, radius_km: 0.2, detours: [chamonix, simplon, lausanne]}
+  # Austria / South Tyrol
+  - {id: silvretta, name: "Silvretta High Alpine Road", lat: 46.9189, lon: 10.0956, detours: [st-anton, landeck]}
+  - {id: hahntennjoch, name: "Hahntennjoch", lat: 47.2915, lon: 10.6650, detours: [reutte, st-anton]}
+  - {id: grossglockner, name: "Grossglockner High Alpine Road", lat: 47.0827, lon: 12.8424, detours: [matrei-osttirol, brenner]}
+  - {id: timmelsjoch, name: "Timmelsjoch", lat: 46.9058, lon: 11.0975, detours: [brenner, reschen]}
+  - {id: penser-joch, name: "Penser Joch", lat: 46.8175, lon: 11.4425, detours: [brixen, bolzano]}
+  - {id: stelvio, name: "Stelvio Pass", lat: 46.5286, lon: 10.4528, detours: [bolzano, livigno]}
+  - {id: umbrail, name: "Umbrail Pass", lat: 46.5428, lon: 10.4339, detours: [bolzano, livigno]}
+  - {id: gavia, name: "Gavia Pass", lat: 46.3437, lon: 10.4877, detours: [aprica, bolzano]}
+  - {id: manghen, name: "Passo Manghen", lat: 46.1720, lon: 11.4400, detours: [ora]}

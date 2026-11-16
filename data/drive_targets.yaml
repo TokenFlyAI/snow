@@ -1,0 +1,7 @@
+# Where to drive to, for resorts whose terrain centre (resorts.yaml lat/lon) snaps to the wrong road:
+# the main base area's parking. scripts/build_drive_table.py routes here; the "Directions" link too.
+deer-valley: [40.6374, -111.4787]       # Snow Park Lodge (the centre snaps to Empire Pass, private roads)
+zermatt: [46.0686, 7.7771]              # Taesch, Matterhorn Terminal: Zermatt is car-free
+whistler-blackcomb: [50.1137, -122.9607]  # Whistler Village day lots
+banff-sunshine: [51.1141, -115.7633]    # Sunshine gondola parking
+grouse-mountain: [49.3713, -123.0988]   # Skyride base
